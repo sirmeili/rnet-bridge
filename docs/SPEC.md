@@ -114,7 +114,7 @@ F0 | target(ctrl, zone, keypad) | source(ctrl, zone, keypad) | type | body... | 
 ### 3.3 Command templates (bytes before checksum)
 | Operation | Frame (before checksum + F7) |
 |---|---|
-| Zone power on/off | `F0 00 00 7F 00 zz 70 05 02 02 00 00 F1 23 00 pp 00 zz 00 01` (pp: 00 off, 01 on) |
+| Zone power on/off | `F0 00 00 7F 00 00 70 05 02 02 00 00 F1 23 00 pp 00 zz 00 01` (pp: 00 off, 01 on; source zone byte is `00`, see note) |
 | All zones on/off | `F0 7E 00 7F 00 00 70 05 02 02 00 00 F1 22 00 pp 00 00 00 01` |
 | Select source | `F0 00 00 7F 00 zz 70 05 02 00 00 00 F1 3E 00 00 00 ss 00 01` (note byte 10 = `00`, unlike the others) |
 | Set volume | `F0 00 00 7F 00 zz 70 05 02 02 00 00 F1 21 00 vv 00 zz 00 01` (vv 0x00–0x32) |
@@ -122,6 +122,13 @@ F0 | target(ctrl, zone, keypad) | source(ctrl, zone, keypad) | type | body... | 
 | Set zone param | `F0 00 00 7F 00 zz 70 00 05 02 00 zz 00 pp 00 00 00 01 00 01 00 vv` |
 | Get zone param | `F0 00 00 7F 00 zz 70 01 05 02 00 zz 00 pp 00 00` |
 | Get all zone info | `F0 00 00 7F 00 zz 70 01 04 02 00 zz 07 00 00` |
+
+**Zone power source zone byte (decision 2026-10-21).** Zone On/Off sends source `00 00 70` (byte 6 = `00`) for
+every zone. The zone is carried in byte 18 only. This matches the PDF §13 hex table verbatim. The PDF's §8.1.1
+template puts `zz` in byte 6 instead. The §3.10 "Zone 2 On" vector previously mixed the two forms (byte 6 =
+`01` with the table's checksum `13`), and has been corrected to the table's frame. Whether `zz` is also
+accepted is checked in M2 (§11 item 8). Every other zone command keeps `zz` in byte 6, and Source Select needs
+it, because byte 6 is its only zone field.
 
 Zone param ids `pp`: `00` bass, `01` treble, `02` loudness, `03` balance, `04` turn-on volume.
 Value encodings:
@@ -220,7 +227,7 @@ Zone 1 Volume Up    F0 00 00 7F 00 00 70 05 02 02 00 00 7F 00 00 00 00 00 01 7B 
 Zone 1 Volume Down  F0 00 00 7F 00 00 70 05 02 02 00 00 F1 7F 00 00 00 00 00 01 6D F7
 Zone 1 On           F0 00 00 7F 00 00 70 05 02 02 00 00 F1 23 00 01 00 00 00 01 12 F7
 Zone 1 Off          F0 00 00 7F 00 00 70 05 02 02 00 00 F1 23 00 00 00 00 00 01 11 F7
-Zone 2 On           F0 00 00 7F 00 01 70 05 02 02 00 00 F1 23 00 01 00 01 00 01 13 F7
+Zone 2 On           F0 00 00 7F 00 00 70 05 02 02 00 00 F1 23 00 01 00 01 00 01 13 F7
 All On              F0 7E 00 7F 00 00 70 05 02 02 00 00 F1 22 00 01 00 00 00 01 0F F7
 All Off             F0 7E 00 7F 00 00 70 05 02 02 00 00 F1 22 00 00 00 00 00 01 0E F7
 Zone 1 Source 1     F0 00 00 7F 00 00 70 05 02 00 00 00 F1 3E 00 00 00 00 00 01 2A F7
