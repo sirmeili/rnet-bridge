@@ -19,6 +19,7 @@ milestone, and do not jump ahead to later milestones unless asked.
 - `docs/protocol.md` — WebSocket/HTTP API contract between firmware and integration
 - `docs/rnet-notes.md` — findings verified on real hardware (overrides the PDF)
 - `docs/reference/russound-rnet-protocol.pdf` — Russound's protocol doc (contains errors; see SPEC §3.9)
+- `docs/reference/russound-rnet-protocol.md` — editable Markdown transcription of the PDF, with errata callouts (Appendix A)
 
 ## Commands
 ```bash
