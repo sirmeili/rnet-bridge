@@ -88,8 +88,10 @@ traffic is seen during bring-up, swap the two TTL lines. This is harmless.
 
 ## 3. RNET protocol — what the firmware implements
 
-The reference PDF is `docs/reference/russound-rnet-protocol.pdf` (RNET protocol doc v1.00.04). This section
-is the authoritative implementation summary, and **corrects known errors in the PDF** (see §3.9).
+The reference PDF is `docs/reference/russound-rnet-protocol.pdf` (RNET protocol doc v1.00.04). A Markdown
+transcription with errata callouts is at `docs/reference/russound-rnet-protocol.md`, and that is the version
+to edit and annotate. This section is the authoritative implementation summary, and **corrects known errors
+in the PDF** (see §3.9).
 All hex values; `zz` = zone − 1 (0–5), `ss` = source − 1 (0–5).
 
 ### 3.1 Framing
@@ -194,12 +196,22 @@ harmless event (to be decided in bring-up). Verify on hardware.
   does, document them. They are not required for v1.
 
 ### 3.9 Known errors in the PDF (do not copy these)
+The full list, with evidence, is in Appendix A of `docs/reference/russound-rnet-protocol.md`. The ones that
+matter for implementation:
 - §6.2 "Zone 1, Menu" breakdown lists checksum `7B`. The correct value is `4E`, as shown in the example line.
+- §6.2 "Zone 3, Record" example prints checksum `49`. The correct value is `4F`.
 - §8.8.3 Get Turn On Volume reply template shows path `04 02 00 zz 01 00 ...` (copied from Volume). The
   expected path is `05 02 00 zz 00 04`. Verify on hardware.
 - §8.8.1 describes Plus/Minus for turn-on volume as "More Left/More Right" (copy-paste error).
-- §3.2 says "DB-96". It is a DB9.
+- §8.3.2 Get Volume reply says "Volume Level -1". This is likely a copy-paste from Get Source. Volume is raw
+  0–50 everywhere else.
+- §3.1 omits the data bits. The port is 8N1.
 - The §13 hex table's Zone Vol Down rows render ambiguously. The correct Zone 1 frame is in §3.10 below.
+- §8.1.1 (Zone On/Off template) puts the zone in the Source Zone ID (byte 6), but the §13 hex table sends
+  `00` there for every zone. Both have valid checksums. See §11.
+- The Quick Reference table marks **Set All Zones On as unsupported on the CAA66** (All Off is supported).
+- (Removed 2026-10-21: an earlier entry said §3.2 reads "DB-96". The PDF reads "Female DB-9". The "6" came
+  from text extraction.)
 
 ### 3.10 Codec test vectors (verified by hand from the PDF)
 Each must encode to exactly these bytes, and decode back:
@@ -483,6 +495,7 @@ entity translations, diagnostics, reauth if a token is added later, unavailable 
     rnet-notes.md              # hardware-verified RNET findings (ACK format, quirks, captures)
     hardware.md                # wiring, cable verification, photos
     reference/russound-rnet-protocol.pdf
+    reference/russound-rnet-protocol.md   # editable transcription of the PDF, with errata
   .github/workflows/
     validate.yml               # hacs/action + hassfest (push, PR, weekly)
     ci.yml                     # firmware build + native tests; ruff, mypy, pytest
@@ -514,7 +527,8 @@ Each milestone ends in something testable. Hardware steps need the human.
 - **M2 — First contact.** Firmware in "serial console" mode: commands typed over USB serial send frames,
   and all RX frames are hex-dumped and decoded. Confirm: Zone 1 power on/off works, all-zone-info reply parses,
   **determine the correct data-handshake format (§3.5)**, check whether the session-start event is needed
-  (§3.6), and check the turn-on-volume reply format. Record findings in `docs/rnet-notes.md` and update the constants.
+  (§3.6), and check the turn-on-volume reply format. Also run the M2 checks in §11 items 7–10. Record findings in
+  `docs/rnet-notes.md` and update the constants.
 - **M3 — Engine.** Queue, ACKs, polling, link state, zone model, mute emulation. Keypad changes show up in the
   USB-serial state dump within one poll cycle.
 - **M4 — Network.** WiFiManager portal, NVS settings, mDNS, `/api/info`, WebSocket API per `docs/protocol.md`,
@@ -551,3 +565,13 @@ Each milestone ends in something testable. Hardware steps need the human.
 5. Whether the controller emits any unsolicited frames when keypads are used (could reduce polling).
 6. Whether keypad displays need a nudge to refresh after a Set Data change (doc says they won't auto-update).
    This is acceptable for v1, but should be noted.
+7. **Is the ACK needed at all with keypad ID `0x70`?** PDF §11 says a Peripheral Source "does not require
+   Handshaking when the keypad ID used to send data is 0x70", and recommends `0x60` when handshaking is wanted.
+   M2 test: send `Get all zone info` with **no** ACK, and watch whether the reply is retransmitted about
+   2.5 s later. Repeat with the hypothesised ACK (§3.5). Record both results.
+8. **Zone On/Off Source Zone ID (byte 6).** Does the controller accept `zz` (PDF §8.1.1 template, SPEC §3.3)
+   and `00` (PDF §13 hex table)? Test Zone 2 On both ways.
+9. **All Zones On on the CAA6.6.** The PDF Quick Reference says it is unsupported on the CAA66. Test whether it
+   does anything. If not, drop or hide the All Zones On button (§5.4).
+10. **Get Volume reply value.** Check whether PDF §8.3.2's "Volume Level -1" is real, by comparing it against
+    all-zone-info byte 23. This only matters if discrete Get Volume is ever used.
