@@ -43,41 +43,55 @@ a zone or enable zone 5.
 - Multiple linked controllers (protocol supports up to 6; design should not preclude it).
 - Do Not Disturb, Party Mode, Background Color. Per the protocol's feature table these are not
   supported on the CAA6.6, and all-zone-info marks Party/DND as unavailable on CAS44/CAA66.
-- Ethernet/PoE hardware revision.
+- ~~Ethernet/PoE hardware revision.~~ The v1 hardware is now PoE-capable (§2.1). Whether v1 networking
+  uses Ethernet, Wi-Fi or both is open (§11 item 11) and must be decided before M4.
 - Getting the integration into HA core (that would require publishing the client as a PyPI library).
 
 ---
 
 ## 2. Hardware
 
-### 2.1 Bill of materials (v1 — parts on hand)
+### 2.1 Bill of materials (v1)
 | Part | Notes |
 |---|---|
-| ESP32 "D1 Mini" style board, USB-C (ESP32-WROOM) | PlatformIO board: `wemos_d1_mini32` (verify against the actual module) |
-| MAX3232 RS232↔TTL module with **female** DB9 | Powered at 3.3 V |
-| DB9 cable/adapter — **likely male-to-male null-modem** | See §2.3 |
-| 5 V USB-C power supply | Near the controller |
+| Olimex **ESP32-POE-ISO** (WROOM, **not** the WROVER variant) | ESP32-D0WD, 4 MB flash, CH340 USB-serial, Ethernet + isolated PoE. PlatformIO board: `esp32-poe-iso` |
+| Olimex **MOD-RS232** | MAX3232 at 3.3 V, **female** DB9, plugs into the board's UEXT connector |
+| UEXT 10-pin IDC cable | If not included with the MOD-RS232 |
+| DB9 **male-to-male null-modem** cable | 2↔3 crossed, 5↔5. Extra handshake wires are harmless (see §2.3) |
+| Power | PoE (802.3af) from the switch, or USB during development |
 
-### 2.2 Wiring (ESP32 ↔ MAX3232)
-| ESP32 | MAX3232 module | Notes |
-|---|---|---|
-| 3V3 | VCC | Do **not** use 5 V; keep TTL levels at 3.3 V |
-| GND | GND | |
-| GPIO17 (UART2 TX) | TXD / TX (TTL input to the module) | Pins configurable in firmware build flags |
-| GPIO16 (UART2 RX) | RXD / RX (TTL output from the module) | |
+**Decision (2026-10-24): hardware changed** from an ESP32 D1 Mini + generic MAX3232 module to the
+ESP32-POE-ISO + MOD-RS232. The reasons: no soldering, plug-together wiring, and a path to wired
+Ethernet/PoE. The WROOM variant is required: WROVER modules use GPIO16/17 for PSRAM, and PSRAM is not
+needed (firmware RAM use is well under 100 KB of 320 KB). The **ISO** variant is required because the
+board's ground is tied to the controller's via RS-232 and, during development, to a PC via USB. On the
+non-ISO board, PoE power is not isolated from those grounds. An earlier ESP8266 board was ruled out:
+it has only one full UART, which USB already uses.
 
-Module silkscreens vary in whether "TX" means "connect your TX here" or "this module's TX". If no
-traffic is seen during bring-up, swap the two TTL lines. This is harmless.
+### 2.2 Wiring (ESP32-POE-ISO ↔ MOD-RS232)
+The MOD-RS232 plugs into the board's UEXT connector. No loose wires. Verified against the Olimex
+schematics (ESP32-POE-ISO Rev O, MOD-RS232 Rev A):
+
+| UEXT pin | ESP32-POE-ISO | MOD-RS232 | Notes |
+|---|---|---|---|
+| 1 | +3.3 V | VCC | MAX3232 runs at 3.3 V |
+| 2 | GND | GND | |
+| 3 | **GPIO4** (U1TXD) | TXD → MAX3232 T1IN | ESP32 transmit. Requires MOD-RS232 jumper `3_TX` closed (default) |
+| 4 | **GPIO36** (U1RXD) | RXD ← MAX3232 R1OUT (330 Ω) | ESP32 receive. Input-only pin; the board adds a Schottky diode + 10 kΩ pull-up. Requires jumper `4_RX` closed (default) |
+
+Firmware uses hardware UART1 on these pins (`config.h`). GPIO16/17 are **not** available on this board
+(GPIO17 is the Ethernet clock output). GPIO12 powers the Ethernet PHY.
 
 ### 2.3 RS-232 side (module ↔ controller)
 - Controller port: female DB9. Pin 2 = controller **transmit**, pin 3 = controller **receive**,
-  pin 5 = ground (protocol doc §3.2; the doc's "DB-96" is a typo). This is DCE-style wiring, which
-  is why a straight cable to the Moxa (a male DTE device) works today.
-- The MAX3232 module is also female and usually DCE-wired, so a **male-to-male null-modem** (2↔3
-  crossed, 5↔5) is expected.
-- **Verify before buying:** with each device powered, measure DB9 pins 2 and 3 against pin 5. The
-  transmit pin idles at roughly −5 to −9 V, and the receive pin reads near 0 V. Wire each transmit pin
-  to the other device's receive pin.
+  pin 5 = ground (protocol doc §3.2). This is DCE-style wiring, which is why a straight cable to the
+  Moxa (a male DTE device) works today.
+- MOD-RS232: female DB9, also DCE-style. MAX3232 T1OUT drives **pin 2** and R1IN reads **pin 3**,
+  per its schematic. Both ends transmit on pin 2, so a **male-to-male null-modem** cable (2↔3 crossed,
+  5↔5) is required. The controller leaves pins 1, 4, 6, 7, 8 and 9 unconnected, so a "full handshake"
+  null-modem cable works as well as a 3-wire one.
+- **Optional check:** with each device powered, measure DB9 pins 2 and 3 against pin 5. The transmit
+  pin idles at roughly −5 to −9 V, and the receive pin reads near 0 V.
 - Only one device can own the controller's RS-232 port, so the Moxa must be disconnected. Remove or
   disable the existing `russound_rnet` integration in HA as well.
 
@@ -242,7 +256,7 @@ Checksum example (doc)    F0 00 67 7C F1 0F 59 F7
 ## 4. Firmware
 
 ### 4.1 Platform
-- PlatformIO, `espressif32` platform, **Arduino framework**, board `wemos_d1_mini32`.
+- PlatformIO, `espressif32` platform, **Arduino framework**, board `esp32-poe-iso` (§2.1).
 - Libraries (pin versions in `platformio.ini`):
   - `ESP32Async/ESPAsyncWebServer` + `ESP32Async/AsyncTCP` (maintained forks) — HTTP + WebSocket
   - `bblanchon/ArduinoJson` v7
@@ -528,8 +542,8 @@ entity translations, diagnostics, reauth if a token is added later, unavailable 
 ## 9. Milestones / bring-up plan
 Each milestone ends in something testable. Hardware steps need the human.
 
-- **M0 — Wiring.** Verify DB9 pinout with a multimeter (§2.3) and obtain the right cable. Do a MAX3232 loopback test
-  (short DB9 pins 2–3, echo bytes from the ESP32).
+- **M0 — Wiring.** Confirm the board (chip, flash) and obtain the null-modem cable (§2.3). Do a MOD-RS232 loopback
+  test: short the module's DB9 pins 2–3 and run the M2 console's `loopback` command.
 - **M1 — Codec.** `lib/rnet` codec + message builders/parsers + native tests passing on all vectors.
 - **M2 — First contact.** Firmware in "serial console" mode: commands typed over USB serial send frames,
   and all RX frames are hex-dumped and decoded. Confirm: Zone 1 power on/off works, all-zone-info reply parses,
@@ -582,3 +596,5 @@ Each milestone ends in something testable. Hardware steps need the human.
    does anything. If not, drop or hide the All Zones On button (§5.4).
 10. **Get Volume reply value.** Check whether PDF §8.3.2's "Volume Level -1" is real, by comparing it against
     all-zone-info byte 23. This only matters if discrete Get Volume is ever used.
+11. **v1 networking: Ethernet, Wi-Fi, or both?** The ESP32-POE-ISO has wired Ethernet + PoE (§2.1). Wired is more
+    reliable and needs no Wi-Fi provisioning portal (§4.4). Decide before M4.

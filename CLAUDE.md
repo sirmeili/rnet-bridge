@@ -10,7 +10,7 @@ implementation details, the network API, the entity model, and the milestone pla
 milestone, and do not jump ahead to later milestones unless asked.
 
 ## Layout
-- `firmware/` — PlatformIO, Arduino framework, board `wemos_d1_mini32`
+- `firmware/` — PlatformIO, Arduino framework, board `esp32-poe-iso`
   - `lib/rnet/` — pure C++ protocol code (codec, messages, engine, zone model). **No Arduino headers here.**
 - `custom_components/rnet_bridge/` — HA integration (Python, asyncio)
 - `tools/` — `fake_bridge.py` (simulated bridge), `rnet_decode.py`, `rnet_cli.py`
@@ -81,6 +81,10 @@ python tools/fake_bridge.py --port 8080
 - If you notice uncommitted changes on `main`, stop and ask the human how to handle them. Don't commit them there.
 
 ## Hardware notes (for context)
-- UART2: GPIO17 TX, GPIO16 RX → MAX3232 module (3.3 V). 19200 8N1, no flow control.
-- Controller DB9: pin 2 TX, pin 3 RX, pin 5 GND. A null-modem M-M cable is likely needed (verify per SPEC §2.3).
+- Board: Olimex ESP32-POE-ISO (WROOM, 4 MB), PlatformIO `esp32-poe-iso`, CH340 USB-serial. RS-232 via Olimex
+  MOD-RS232 on the UEXT connector (SPEC §2).
+- UART1: GPIO4 TX, GPIO36 RX (input-only) → MOD-RS232 (MAX3232, 3.3 V). 19200 8N1, no flow control.
+  GPIO16/17 are not available (GPIO17 is the Ethernet clock).
+- Controller DB9: pin 2 TX, pin 3 RX, pin 5 GND. Both it and the MOD-RS232 transmit on pin 2, so a male-to-male
+  null-modem cable is required (SPEC §2.3).
 - The controller's port supports one client only. The old Moxa/`russound_rnet` setup must be disconnected.
