@@ -86,17 +86,10 @@ bool param_from_wire(ZoneParam param, uint8_t wire, int8_t& value) {
 
 bool valid_param(uint8_t raw) { return raw <= static_cast<uint8_t>(ZoneParam::kTurnOnVolume); }
 
-// View of a Set Data body: target path, source path, packet number/count, data length, data.
-struct DataView {
-  const uint8_t* target_path;
-  size_t target_path_len;
-  const uint8_t* source_path;
-  size_t source_path_len;
-  const uint8_t* data;
-  size_t data_len;
-};
 
-bool split_set_data(const Frame& f, DataView& v) {
+}  // namespace
+
+bool split_set_data(const Frame& f, SetDataView& v) {
   if (f.type != static_cast<uint8_t>(MsgType::kSetData)) {
     return false;
   }
@@ -129,13 +122,12 @@ bool split_set_data(const Frame& f, DataView& v) {
   return v.data_len <= left;
 }
 
-}  // namespace
-
-bool build_zone_power(uint8_t zone, bool on, WireFrame& out) {
+bool build_zone_power(uint8_t zone, bool on, WireFrame& out, PowerSourceZone source_zone) {
   if (!valid_zone(zone)) {
     return fail(out);
   }
-  return build_event(kController, bridge_id(0x00), kPathRunMenu, event_id::kZoneOnOff,
+  const uint8_t source_zone_id = source_zone == PowerSourceZone::kZone ? wire_zone(zone) : 0x00;
+  return build_event(kController, bridge_id(source_zone_id), kPathRunMenu, event_id::kZoneOnOff,
                      on ? 1 : 0, wire_zone(zone), out);
 }
 
@@ -237,7 +229,7 @@ bool build_handshake(const DeviceId& target, const DeviceId& source, uint8_t han
 }
 
 ReplyResult parse_all_zone_info(const Frame& frame, ZoneInfo& out) {
-  DataView v{};
+  SetDataView v{};
   if (!split_set_data(frame, v) || v.source_path_len != 4 || v.source_path[0] != 0x02 ||
       v.source_path[1] != 0x00 || v.source_path[3] != kZoneInfoBranch) {
     return ReplyResult::kNotThisMessage;
@@ -271,7 +263,7 @@ ReplyResult parse_all_zone_info(const Frame& frame, ZoneInfo& out) {
 }
 
 ReplyResult parse_zone_param(const Frame& frame, ZoneParamValue& out) {
-  DataView v{};
+  SetDataView v{};
   if (!split_set_data(frame, v) || v.source_path_len != 5 || v.source_path[0] != 0x02 ||
       v.source_path[1] != 0x00 || v.source_path[3] != 0x00 || !valid_param(v.source_path[4])) {
     return ReplyResult::kNotThisMessage;

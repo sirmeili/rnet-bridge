@@ -92,6 +92,10 @@ class FrameParser {
   void reset();
   bool in_frame() const { return state_ == State::kInFrame; }
   const Frame& frame() const { return frame_; }
+  // Wire bytes (F0 through F7, as received) of the frame that the last kFrame, kChecksumError or
+  // kMalformed result refers to. Valid until the next call to feed() or reset().
+  const uint8_t* last_wire() const { return raw_; }
+  size_t last_wire_len() const { return last_wire_len_; }
 
  private:
   enum class State : uint8_t { kIdle, kInFrame, kDiscarding };
@@ -99,8 +103,9 @@ class FrameParser {
   ParseResult complete();
 
   State state_ = State::kIdle;
-  uint8_t raw_[kMaxWireBytes];  // F0 through checksum, as received
+  uint8_t raw_[kMaxWireBytes];  // F0 through checksum (plus F7 once complete), as received
   size_t raw_len_ = 0;
+  size_t last_wire_len_ = 0;
   Frame frame_{};
 };
 
