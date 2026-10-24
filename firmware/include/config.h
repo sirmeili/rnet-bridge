@@ -8,12 +8,17 @@
 
 namespace config {
 
-constexpr const char* kFirmwareVersion = "0.0.1";
+constexpr const char* kFirmwareVersion = "0.0.2";
 
-// UART2 to the MAX3232 module (SPEC §2.2, §2.4). Swap RX/TX if no traffic is seen during bring-up.
-constexpr int kRnetRxPin = 16;
-constexpr int kRnetTxPin = 17;
+// UART1 to the Olimex MOD-RS232 via the UEXT connector (SPEC §2.2, §2.4): UEXT pin 3 = GPIO4 (TX),
+// UEXT pin 4 = GPIO36 (RX, input-only). Verified against the ESP32-POE-ISO Rev O schematic.
+constexpr int kRnetRxPin = 36;
+constexpr int kRnetTxPin = 4;
 constexpr uint32_t kRnetBaud = 19200;  // 8N1, no flow control
+
+// A partial RX frame is dropped if no byte arrives for this long. One byte at 19200 baud takes
+// ~0.5 ms, and frames are sent back-to-back.
+constexpr uint32_t kRnetInterByteTimeoutMs = 50;
 
 constexpr uint32_t kUsbSerialBaud = 115200;
 
