@@ -77,7 +77,8 @@
           "part": "fit"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "test-front",
