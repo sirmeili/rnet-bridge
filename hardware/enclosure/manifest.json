@@ -35,7 +35,8 @@
           "part": "lid"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "lid-inlay",
@@ -48,7 +49,8 @@
           "part": "lid_inlay"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "inlay-check",
@@ -61,7 +63,8 @@
           "part": "inlay_check"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "fit",
@@ -87,7 +90,8 @@
           "part": "test_front"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "test-back",
@@ -100,7 +104,8 @@
           "part": "test_back"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "test-lid-leds",
@@ -113,7 +118,8 @@
           "part": "test_lid_leds"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "plunger",
@@ -126,7 +132,8 @@
           "part": "plunger"
         }
       },
-      "hidden": true
+      "hidden": true,
+      "omit": true
     },
     {
       "id": "lid-asm",
