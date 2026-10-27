@@ -13,6 +13,7 @@ milestone, and do not jump ahead to later milestones unless asked.
 - `firmware/` — PlatformIO, Arduino framework, board `wemos_d1_mini32`
   - `lib/rnet/` — pure C++ protocol code (codec, messages, engine, zone model). **No Arduino headers here.**
 - `custom_components/rnet_bridge/` — HA integration (Python, asyncio)
+- `hardware/enclosure/` — 3D-printable case (OpenSCAD) and viewer `manifest.json`; see its README
 - `tools/` — `fake_bridge.py` (simulated bridge), `rnet_decode.py`, `rnet_cli.py`
 - `tests/` — pytest for the integration
 - `docs/SPEC.md` — project specification ("SPEC §x" in this file refers to its sections)
