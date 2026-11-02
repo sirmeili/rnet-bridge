@@ -84,7 +84,9 @@ Controlled test on the only keypad (utility room, zone 1). It starts at zone 1 o
 - The console's `!! DUPLICATE` flag fires on repeated keypad presses. It was written for retransmitted replies
   to the bridge, so ignore it for keypad traffic.
 - An earlier session's traffic was all wire zone `03` (zone 4) from keypad `00` and `7C`, with Setup/Next/Plus/Minus
-  presses. Why it showed zone 4 is unexplained: ask the human. In that session, keypads ACKed the controller's
+  presses. The keypad was set to zone 4 then; the human switched it to zone 1 afterwards (keypad menu), which
+  matches the zone 1 traffic above and confirms wire zone = zone − 1. The keypad ended on volume 70 as decoded. In
+  that session, keypads ACKed the controller's
   SetData with `F0 00 00 7F 00 03 7C 02 02 7B F7` (handshake type `02`, the §3.5 hypothesis shape) and sent type
   `06`/`07` handshakes after events and type-`06` frames.
 
