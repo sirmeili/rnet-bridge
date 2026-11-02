@@ -98,7 +98,16 @@ For a clean test, power-cycle the controller first, so it has seen no events sin
 
 Record which step first produced a reply. That decides `config::kSessionStartEvent`.
 
-Result: _pending_
+Result (2026-11-02): **step 1 replied, with no session-start event.** The bridge had transmitted nothing before
+this (`tx=0`). Caveat: the controller had not been power-cycled immediately before, and it had seen keypad
+events since its last boot. Repeat after a power-cycle with no keypad use to be certain. This also confirms
+M0.2: the null-modem cable works in both directions. The reply arrived 40 ms after the request and matches the
+keypad (zone 1 on, source 2, volume 70 = raw 35) and the SPEC §3.4 layout byte for byte:
+```
+TX F0 00 00 7F 00 00 70 01 04 02 00 00 07 00 00 7C F7 (get all zone info)
+RX F0 00 00 70 00 00 7F 00 00 04 02 00 00 07 00 00 01 00 0C 00 01 01 23 0A 0A 00 0A 01 00 00 00 00 5D F7
+   SetData 00.00.70<-00.00.7F ZoneInfo z1 on src=2 vol=35 bass=0 treble=0 loud=off bal=0 sys=on shared=no
+```
 
 ### M2.3 Zone power and source-zone byte (SPEC §11.8)
 1. `pwrsrc 00`, then `on 1` / `off 1`. Does zone 1 follow?
@@ -114,7 +123,10 @@ Result: _pending_
 3. If yes: `acktype 06` and repeat. Then try other values if needed, and record each result.
 4. Note any `Handshake` frames the controller sends after `set ...` commands. Those are its ACKs to us.
 
-Result (working ACK type, or "not needed"): _pending_
+Result (working ACK type, or "not needed"): step 1, 2026-11-02, `autoack off`: after `info 1`, there was **no
+retransmission in the following 6 s** (duplicates counter unchanged, `acks_tx=0`). So for a Request from keypad
+`0x70` the controller doesn't expect an ACK (§11.7, consistent with PDF §11). Still to check: whether the same
+holds for `set ...` commands, and whether the controller sends us handshakes after them (step 4).
 
 ### M2.5 All-zone-info parsing (SPEC §3.4)
 For each zone 1–6: `info <z>`. Check that each decoded line matches the keypad (power, source,
