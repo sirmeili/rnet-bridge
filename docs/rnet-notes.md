@@ -132,13 +132,36 @@ holds for `set ...` commands, and whether the controller sends us handshakes aft
 For each zone 1–6: `info <z>`. Check that each decoded line matches the keypad (power, source,
 volume ×2, bass, treble, loudness, balance). Paste one full RX line.
 
-Result: _pending_
+Result (2026-11-02): **all six zones reply** in about 40 ms with the §3.4 layout, including zones that are off.
+Zone 1 matches the keypad. Zones 2–6 have no keypad to compare against, but their distinct tone values suggest
+real stored settings (spot-check: zone 4 should show bass/treble +4).
+
+| Zone | Power | Source | Volume | Bass | Treble | Loud | Balance |
+|---|---|---|---|---|---|---|---|
+| 1 | on | 2 | 35 | 0 | 0 | off | 0 |
+| 2 | off | 1 | 23 | 0 | −1 | off | 0 |
+| 3 | off | 1 | 24 | 0 | 0 | on | 0 |
+| 4 | off | 1 | 36 | +4 | +4 | off | 0 |
+| 5 | off | 1 | 33 | +1 | 0 | off | 0 |
+| 6 | off | 1 | 15 | −1 | 0 | off | 0 |
+```
+TX F0 00 00 7F 00 03 70 01 04 02 00 03 07 00 00 02 F7 (get all zone info)
+RX F0 00 03 70 00 00 7F 00 00 04 02 00 03 07 00 00 01 00 0C 00 00 00 24 0E 0E 00 0A 01 00 00 00 00 6A F7
+   SetData 00.03.70<-00.00.7F ZoneInfo z4 off src=1 vol=36 bass=4 treble=4 loud=off bal=0 sys=on shared=no
+```
+No retransmissions with `autoack off` for any of the reads.
 
 ### M2.6 Turn-on volume reply format (SPEC §11.3)
 `get 1 tov`. A decoded `ZoneParam z1 tov=..` means the expected format is right. If the line shows
 `(INVALID reply)` or raw `tpath=/spath=` instead, paste the hex. That is the real format.
 
-Result: _pending_
+Result (2026-11-02): **the expected format is correct** (SPEC §3.4/§3.9). The path is `05 02 00 zz 00 04`, not
+the PDF §8.8.3 template's `04 02 00 zz 01 00`. Zone 1 turn-on volume = 35 (70%).
+```
+TX F0 00 00 7F 00 00 70 01 05 02 00 00 00 04 00 00 7B F7 (get zone param)
+RX F0 00 00 70 00 00 7F 00 00 05 02 00 00 00 04 00 00 01 00 01 00 23 25 F7
+   SetData 00.00.70<-00.00.7F ZoneParam z1 tov=35
+```
 
 ### M2.7 Tone/turn-on-volume while a zone is off (SPEC §11.4)
 `off 1`, `set 1 bass 3`, `on 1`, `info 1`. Does `bass=3` show? Restore with `set 1 bass 0`.
