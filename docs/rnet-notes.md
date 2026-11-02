@@ -9,7 +9,7 @@ answered here, and the matching constants in `firmware/include/config.h` are upd
 | Item | Value | How verified |
 |---|---|---|
 | Controller | Russound CAA6.6 | — |
-| Bridge board | Olimex ESP32-POE-ISO (WROOM) | _fill in: `esptool flash_id` output (chip, flash size) and board revision printed on the PCB_ |
+| Bridge board | Olimex ESP32-POE-ISO (WROOM) | 2026-11-02 `esptool flash_id`: ESP32-D0WD-V3 (rev v3.1), 40 MHz crystal, 4 MB flash, USB-serial CH340 (VID:PID 1A86:7523). _Board revision printed on the PCB: fill in_ |
 | RS-232 module | Olimex MOD-RS232 Rev A on UEXT | Schematic: T1OUT → DB9 pin 2, R1IN ← DB9 pin 3 |
 | UART pins | GPIO4 TX, GPIO36 RX (UART1) | ESP32-POE-ISO Rev O schematic, UEXT pins 3/4 |
 | Cable | DB9 male-to-male null-modem | _fill in: loopback/first contact result_ |
@@ -37,7 +37,17 @@ Work through these in order and paste the relevant console output under each ste
 2. Run `loopback`. Expected: `loopback: PASS (64/64 bytes echoed intact)`.
 3. Remove the short.
 
-Result: _pending_
+Result: **PASS (2026-11-02).** Firmware 0.0.2. The short was across pins 2–3 at the far (male) end of the
+null-modem cable attached to the MOD-RS232, so the cable's pin 2/3 conductors are verified too. This can't tell
+a null-modem cable from a straight one; M0.2 does that.
+```
+> loopback
+loopback: sent 64 bytes, waiting for echo...
+> loopback: PASS (64/64 bytes echoed intact)
+> stats
+tx=0 rx=0 checksum_errors=0 dropped=0 timeouts=0 duplicates=0 handshakes_rx=0 acks_tx=0
+autoack=off acktype=0x02 pwrsrc=00
+```
 
 ### M0.2 Controller connection
 1. Disconnect the Moxa. Disable the `russound_rnet` integration in HA.
