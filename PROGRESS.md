@@ -26,7 +26,13 @@
   So far this environment has only run a smoke test outside the repo, because `tests/` does not exist yet.
 - OpenSCAD 2021.01: `C:\Program Files\OpenSCAD\openscad.exe`, not on PATH.
 
+- 2026-11-02: The target board is the Olimex ESP32-POE-ISO + MOD-RS232 (human decision), not the D1 Mini +
+  MAX3232 in SPEC §2. SPEC, CLAUDE.md, `platformio.ini` (board `esp32-poe-iso`) and `config.h` pins still need
+  updating to match.
+
 ## Open questions
-- Which board is the target? SPEC §2 and CLAUDE.md say ESP32 D1 Mini + MAX3232, and SPEC §1.2 lists Ethernet/PoE as
-  a non-goal. `hardware/enclosure/README.md` describes an Olimex ESP32-POE-ISO + MOD-RS232 and cites SPEC §2. This
-  affects pins, the PlatformIO board, and Wi-Fi vs Ethernet in M4.
+- Network for the POE-ISO: Ethernet only, Ethernet with Wi-Fi fallback, or Wi-Fi only? SPEC §1.2 lists Ethernet/PoE
+  as a non-goal, and §4.4 assumes a WiFiManager portal.
+- UART pins: the current `config.h` uses GPIO16/17. On the POE-ISO, GPIO17 is believed to be the Ethernet PHY clock,
+  and the MOD-RS232 is believed to connect through UEXT on GPIO4 (TX) / GPIO36 (RX). Confirm against the Olimex
+  schematic and the actual wiring before changing anything.
