@@ -6,7 +6,14 @@
 
 ## In progress
 - `feat/m2-first-contact`: M2 serial console, diagnostics, and the bring-up checklist in `docs/rnet-notes.md`.
-  Merged with `main` on 2026-11-02. Next: flash the board and run the checklist (M0.1 onward) with the human.
+  Merged with `main` on 2026-11-02. Board flashed with 0.0.2 over USB (COM4, CH340).
+  - M0.1 loopback: PASS (recorded in `rnet-notes.md`).
+  - M0.2/M2.1: bridge connected to the controller. A 5-minute passive capture (bridge sent nothing, `tx=0`) received
+    about 300 valid frames, so controller → bridge works. The port repeats keypad bus traffic, mostly from zone 4
+    (wire value 03); keypads ACK the controller's SetData with `F0 00 00 7F 00 03 7C 02 02 7B F7` (handshake type
+    0x02). Not yet recorded in `rnet-notes.md`: waiting on the human's power-cycle time and keypad actions.
+  - **Paused 2026-11-02 by the human: the keypad was not working as expected.** Resume only when told. Next step
+    after that: M2.2 (`info 1`, the first frame the bridge sends).
 
 ## Next
 - M0 and M2 need the human and the hardware (SPEC §9). M5 onward can proceed without hardware using `fake_bridge.py`.
