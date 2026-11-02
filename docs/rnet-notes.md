@@ -60,7 +60,33 @@ Result: _pending_
 Type nothing. Change volume/source/power at a keypad and watch for RX lines. Any frames that appear
 are unsolicited and worth recording: they could reduce polling later.
 
-Result: _pending_
+Result (2026-11-02, firmware 0.0.2, bridge sent nothing, `tx=0`): **the controller's RS-232 port repeats keypad
+bus traffic** (SPEC §11.5: yes). The controller → bridge direction of the cable works: 266 frames, 0 checksum
+errors, 0 dropped. Bridge → controller is still untested.
+
+Controlled test on the only keypad (utility room, zone 1). It starts at zone 1 on, source 2, volume 68:
+
+| Pressed | Keypad event (source `00.00.00`, target `00.00.7F`) | Controller → zone 1 keypads (`00.00.7D`, type `06`) |
+|---|---|---|
+| Vol Up, tapped twice | `7F`, then `97` 0.2 s later (`97` = second tap/hold?) | body `23 0A 90 01 10`, then `24 ...`: volume 35, 36 (shows 70, 72) |
+| Vol Up | `7F` | `25 ...`: 37 (74) |
+| Vol Down ×2 | `80` (sent as `F1 7F`) each | `24 ...`, `23 ...`: 72, 70 |
+| Source ×4 | `6B` each | `43 02`, `44 03`, `41 00`, `42 01`: sources 3, 4, 1, 2 |
+
+- Keypad events are `F0 00 00 7F 00 zz 00 05 03 02 00 00 02 04 03 <id> 00 00 00 00 00 01 cs F7`, with button ids
+  from protocol §6.1 (`6B` Source, `7F`/`80` Vol Up/Down). Other ids seen in an earlier session: `64` Setup,
+  `68` Next, `69`/`6A` Plus/Minus, `98` (after Vol Down; hold?). **Power (`6C`) was never seen**, because the
+  keypad's power button is broken.
+- After each source change the controller broadcasts `7E.zz.00` event `C8` with data = source bitmask (`01`,
+  `02`, `04`, `08`), and `00.7D.ss` event `27` with data = source index. It repeats `7E.7D.zz` event `C8` every
+  60 s.
+- Sources only cycle 1–4, so sources 5–6 are disabled in the controller's programming.
+- The console's `!! DUPLICATE` flag fires on repeated keypad presses. It was written for retransmitted replies
+  to the bridge, so ignore it for keypad traffic.
+- An earlier session's traffic was all wire zone `03` (zone 4) from keypad `00` and `7C`, with Setup/Next/Plus/Minus
+  presses. Why it showed zone 4 is unexplained: ask the human. In that session, keypads ACKed the controller's
+  SetData with `F0 00 00 7F 00 03 7C 02 02 7B F7` (handshake type `02`, the §3.5 hypothesis shape) and sent type
+  `06`/`07` handshakes after events and type-`06` frames.
 
 ### M2.2 Session start (SPEC §11.2)
 For a clean test, power-cycle the controller first, so it has seen no events since boot.
