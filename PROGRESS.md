@@ -8,12 +8,20 @@
 - `feat/m2-first-contact`: M2 serial console, diagnostics, and the bring-up checklist in `docs/rnet-notes.md`.
   Merged with `main` on 2026-11-02. Board flashed with 0.0.2 over USB (COM4, CH340).
   - M0.1 loopback: PASS (recorded in `rnet-notes.md`).
-  - M0.2/M2.1: bridge connected to the controller. A 5-minute passive capture (bridge sent nothing, `tx=0`) received
-    about 300 valid frames, so controller → bridge works. The port repeats keypad bus traffic, mostly from zone 4
-    (wire value 03); keypads ACK the controller's SetData with `F0 00 00 7F 00 03 7C 02 02 7B F7` (handshake type
-    0x02). Not yet recorded in `rnet-notes.md`: waiting on the human's power-cycle time and keypad actions.
-  - **Paused 2026-11-02 by the human: the keypad was not working as expected.** Resume only when told. Next step
-    after that: M2.2 (`info 1`, the first frame the bridge sends).
+  - **M0 and the whole M2 checklist are done (2026-11-02).** All results are in `docs/rnet-notes.md`, with a summary
+    table at the end. The cable works both ways, every request was answered in about 40 ms, and nothing was ever
+    retransmitted. The controller was left as found: zone 1 on, source 2, volume 35, bass 0.
+  - The keypad's power button is broken (hardware). It never sends `6C`.
+  - Proposed follow-ups, **waiting for the human's OK**:
+    - `config::kSessionStartEvent` → `kNone` (no session start was needed). Optionally confirm first with
+      `info 1` straight after a controller power-cycle, with no keypad use.
+    - M3 engine: don't send data ACKs (not needed for keypad `0x70`). Treat the controller's `02` handshake after
+      our Set Data as a link-health signal (SPEC §3.5).
+    - SPEC §5.4: drop or hide the All Zones On button (it does nothing on this CAA6.6).
+    - SPEC §3.5/§3.6/§11: mark the answered questions, pointing to `rnet-notes.md`.
+    - The console's duplicate detector flags repeated keypad presses and the controller's 60 s broadcast. Fine for
+      M2; the M3 `duplicate_replies` stat must count only replies to the bridge's own requests.
+  - Branch not pushed yet: waiting on the human to confirm the other computer has no unpushed work.
 
 ## Next
 - M0 and M2 need the human and the hardware (SPEC §9). M5 onward can proceed without hardware using `fake_bridge.py`.

@@ -114,7 +114,19 @@ RX F0 00 00 70 00 00 7F 00 00 04 02 00 00 07 00 00 01 00 0C 00 01 01 23 0A 0A 00
 2. `pwrsrc zz`, then `on 2` / `off 2`. Does zone 2 follow?
 3. `pwrsrc 00`, then `on 2` / `off 2` (the default form for a zone other than 1).
 
-Result: _pending_
+Result (2026-11-02): **all three work.** Each was confirmed with `info <z>` afterwards. The controller accepts
+both `00` and `zz` in byte 6 for Zone On/Off (§11.8). Keep the default `00` (PDF §13 table).
+```
+TX F0 00 00 7F 00 01 70 05 02 02 00 00 F1 23 00 01 00 01 00 01 14 F7 (on, pwrsrc zz)
+TX F0 00 00 7F 00 00 70 05 02 02 00 00 F1 23 00 01 00 01 00 01 13 F7 (on, pwrsrc 00)
+   then: ZoneInfo z2 on src=4 vol=23 ...
+```
+- The controller sends **no handshake** to the bridge after these events, and nothing is retransmitted.
+- Zone 1 `off` → `on` restores source 2 and volume 35. With every zone off, all-zone-info reports `sys=off`.
+- **The source of a zone that is off isn't meaningful.** Zone 2 read `src=1` while off, came on at source 4, and
+  then read `src=4` when off again. The integration shouldn't rely on it while a zone is off.
+- Each power change triggers controller → keypad updates (`00.zz.7D`) and a broadcast `7E.zz.70` event `C8`
+  whose data is the bitmask of sources in use system-wide (e.g. `0x0A` = sources 2 and 4).
 
 ### M2.4 Data handshake / ACK (SPEC §3.5, §11.1, §11.7)
 1. `autoack off`. Run `info 1` and wait 5 s. Does a `!! DUPLICATE` appear about 2.5 s later?
@@ -125,8 +137,13 @@ Result: _pending_
 
 Result (working ACK type, or "not needed"): step 1, 2026-11-02, `autoack off`: after `info 1`, there was **no
 retransmission in the following 6 s** (duplicates counter unchanged, `acks_tx=0`). So for a Request from keypad
-`0x70` the controller doesn't expect an ACK (§11.7, consistent with PDF §11). Still to check: whether the same
-holds for `set ...` commands, and whether the controller sends us handshakes after them (step 4).
+`0x70` the controller doesn't expect an ACK (§11.7, consistent with PDF §11). In 40 requests and commands across
+M2.2–M2.10, nothing the controller sent the bridge was ever retransmitted, all with `autoack off`. **Conclusion:
+no data ACK is needed for keypad `0x70`.** Steps 2–3 weren't needed.
+
+Step 4: after each Set Data (`set 1 bass ...`), the controller sends the bridge **`F0 00 00 70 00 00 7F 02 02 6C
+F7`**, a handshake type `02` targeted at `00.00.70`, within about 25 ms. After events (power, All Off) it sends
+no handshake.
 
 ### M2.5 All-zone-info parsing (SPEC §3.4)
 For each zone 1–6: `info <z>`. Check that each decoded line matches the keypad (power, source,
@@ -166,20 +183,54 @@ RX F0 00 00 70 00 00 7F 00 00 05 02 00 00 00 04 00 00 01 00 01 00 23 25 F7
 ### M2.7 Tone/turn-on-volume while a zone is off (SPEC §11.4)
 `off 1`, `set 1 bass 3`, `on 1`, `info 1`. Does `bass=3` show? Restore with `set 1 bass 0`.
 
-Result: _pending_
+Result (2026-11-02): **yes, Set Data works while the zone is off** (§11.4). `get 1 bass` read 3 while the zone was
+off, and after `on 1`, all-zone-info showed `bass=3` with source and volume unchanged. Restored to 0 and
+confirmed.
+```
+TX F0 00 00 7F 00 00 70 00 05 02 00 00 00 00 00 00 00 01 00 01 00 0D 0B F7 (set zone param)
+RX F0 00 00 70 00 00 7F 02 02 6C F7
+   Handshake 00.00.70<-00.00.7F type=0x02
+```
 
 ### M2.8 Keypad display refresh (SPEC §11.6)
 After `set 1 bass 3` with zone 1 on, does the keypad's bass display update on its own?
 
-Result: _pending_
+Result (2026-11-02): **the keypad showed +3** when the human opened its bass setting. The controller sent the
+keypads no update after the Set Data, so the keypad probably reads the value when the menu opens. No nudge is
+needed for tone settings. Not checked: whether an always-visible value (volume on the main display) would
+refresh after a Set Data. Volume is set by an event, which the controller does push to keypads (M2.3).
 
 ### M2.9 All On / All Off on the CAA6.6 (SPEC §11.9)
 `alloff`, then `allon`. Do any zones turn on? Only zones set to "System On Enable" are affected.
 
-Result: _pending_
+Result (2026-11-02): **All Off works; All On does nothing.** After `alloff`, all six zones read off (`sys=off`).
+After `allon`, all six still read off. This matches the PDF Quick Reference (All On unsupported on CAA66). It is
+possible that no zone has "System On Enable" set in the controller's programming, but either way All On is no
+use here: **drop or hide the All Zones On button** (SPEC §5.4). Zone 1 was turned back on afterwards.
 
 ### M2.10 Get Volume reply offset (SPEC §11.10)
 Discrete Get Volume isn't a console command; send it raw for zone 1:
 `rawfix F0 00 00 7F 00 00 70 01 04 02 00 00 01 00 00`. Compare the value byte with `info 1`'s `vol=`.
 
-Result: _pending_
+Result (2026-11-02): **no offset.** Get Volume returned `0x23` = 35, the same as all-zone-info `vol=35`. The PDF
+§8.3.2 "Volume Level −1" is a copy-paste error. The console's generic SetData decoder mislabels this reply's
+path (`tpath=- spath=02.00.00.01`); the bytes themselves follow the usual layout.
+```
+TX F0 00 00 7F 00 00 70 01 04 02 00 00 01 00 00 76 F7 (rawfix)
+RX F0 00 00 70 00 00 7F 00 00 04 02 00 00 01 00 00 01 00 01 00 23 20 F7
+```
+
+## Summary of M2 (2026-11-02)
+| SPEC §11 | Answer |
+|---|---|
+| 1, 7 Data ACK | Not needed for keypad `0x70` (no retransmissions with `autoack off`) |
+| 2 Session start | Not needed in this test (caveat: no fresh power-cycle immediately before) |
+| 3 Turn-on volume reply | Path `05 02 00 zz 00 04`, as SPEC expected |
+| 4 Set Data while off | Works |
+| 5 Unsolicited frames | Yes: the port repeats keypad bus traffic (M2.1) |
+| 6 Keypad refresh | Tone value showed correctly on the keypad; no nudge needed |
+| 8 Zone power byte 6 | `00` and `zz` both work |
+| 9 All On | Does nothing on this CAA6.6. All Off works |
+| 10 Get Volume offset | None |
+
+`config.h` constants are not changed yet; see PROGRESS.md for the proposed changes.
