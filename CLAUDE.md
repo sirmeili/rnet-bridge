@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## What this repo is
-RNET Bridge: an ESP32 + MAX3232 device that plugs into a Russound RNET controller's RS-232 port (target:
+RNET Bridge: an Olimex ESP32-POE-ISO + MOD-RS232 device that plugs into a Russound RNET controller's RS-232 port (target:
 CAA6.6). It exposes the controller over a WebSocket/JSON API, alongside a Home Assistant custom integration
 (`rnet_bridge`) that turns each zone into a media player plus tone/config entities.
 
@@ -10,7 +10,7 @@ implementation details, the network API, the entity model, and the milestone pla
 milestone, and do not jump ahead to later milestones unless asked.
 
 ## Layout
-- `firmware/` — PlatformIO, Arduino framework, board `wemos_d1_mini32`
+- `firmware/` — PlatformIO, Arduino framework, board `esp32-poe-iso`
   - `lib/rnet/` — pure C++ protocol code (codec, messages, engine, zone model). **No Arduino headers here.**
 - `custom_components/rnet_bridge/` — HA integration (Python, asyncio)
 - `hardware/enclosure/` — 3D-printable case (OpenSCAD) and viewer `manifest.json`; see its README
@@ -82,6 +82,11 @@ python tools/fake_bridge.py --port 8080
 - If you notice uncommitted changes on `main`, stop and ask the human how to handle them. Don't commit them there.
 
 ## Hardware notes (for context)
-- UART2: GPIO17 TX, GPIO16 RX → MAX3232 module (3.3 V). 19200 8N1, no flow control.
-- Controller DB9: pin 2 TX, pin 3 RX, pin 5 GND. A null-modem M-M cable is likely needed (verify per SPEC §2.3).
+- Board: Olimex ESP32-POE-ISO. Network: Ethernet first, Wi-Fi fallback (SPEC §4.4).
+- UART2: GPIO4 TX, GPIO36 RX on the UEXT header → MOD-RS232 by ribbon cable. 19200 8N1, no flow control.
+  The pins come from Olimex demo code and are unverified (SPEC §11 item 11). GPIO36 is input-only, so TX/RX can't
+  be swapped in firmware; use the MOD-RS232's swap jumpers.
+- Ethernet owns GPIO17 (RMII clock out), GPIO12 (PHY power), GPIO23/18 (MDC/MDIO) and the RMII data pins. Don't
+  reuse them (SPEC §2.2).
+- Controller DB9: pin 2 TX, pin 3 RX, pin 5 GND. The cable depends on the MOD-RS232's DB9 (verify per SPEC §2.3).
 - The controller's port supports one client only. The old Moxa/`russound_rnet` setup must be disconnected.

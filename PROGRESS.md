@@ -26,13 +26,15 @@
   So far this environment has only run a smoke test outside the repo, because `tests/` does not exist yet.
 - OpenSCAD 2021.01: `C:\Program Files\OpenSCAD\openscad.exe`, not on PATH.
 
-- 2026-11-02: The target board is the Olimex ESP32-POE-ISO + MOD-RS232 (human decision), not the D1 Mini +
-  MAX3232 in SPEC §2. SPEC, CLAUDE.md, `platformio.ini` (board `esp32-poe-iso`) and `config.h` pins still need
-  updating to match.
+- 2026-11-02: The hardware is an Olimex ESP32-POE-ISO + MOD-RS232 on a UEXT ribbon cable (human decision), and the
+  network is Ethernet with Wi-Fi fallback (human decision). SPEC §1, §2, §4.1, §4.2, §4.4, §9, §10 and §11 and
+  CLAUDE.md are updated. Board is `esp32-poe-iso`, and the UART moves to GPIO4 TX / GPIO36 RX, because GPIO17 is the
+  Ethernet clock.
 
 ## Open questions
-- Network for the POE-ISO: Ethernet only, Ethernet with Wi-Fi fallback, or Wi-Fi only? SPEC §1.2 lists Ethernet/PoE
-  as a non-goal, and §4.4 assumes a WiFiManager portal.
-- UART pins: the current `config.h` uses GPIO16/17. On the POE-ISO, GPIO17 is believed to be the Ethernet PHY clock,
-  and the MOD-RS232 is believed to connect through UEXT on GPIO4 (TX) / GPIO36 (RX). Confirm against the Olimex
-  schematic and the actual wiring before changing anything.
+- The fallback rules in SPEC §4.4 (10 s Ethernet wait, prefer Ethernet when it returns, when the portal starts) are
+  a proposal. Confirm them before M4.
+- SPEC §11 items 11–13: the UEXT pins (from Olimex demo code; confirm in M0), the MOD-RS232 DB9 gender/wiring, and
+  `wifi_rssi` in `/api/info` on Ethernet.
+- Arduino core version for Ethernet: Olimex's example targets core 3.x, but the pinned platform has core 2.0.17.
+  Decide at M4.

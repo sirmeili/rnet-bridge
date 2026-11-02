@@ -15,7 +15,7 @@ controller reaches Home Assistant through a Moxa NPort serial-to-IP converter an
 
 This project replaces it with two pieces:
 
-1. **Firmware** for an ESP32 + MAX3232 module plugged directly into the controller's DB9 port. The
+1. **Firmware** for an Olimex ESP32-POE-ISO + MOD-RS232 plugged directly into the controller's DB9 port. The
    firmware owns all RNET timing (framing, escaping, checksums, handshake ACKs, pacing, retries,
    polling). It keeps a live model of zone state and exposes that state over a **WebSocket/JSON API**
    on the LAN. It advertises itself over **mDNS/zeroconf**.
@@ -33,7 +33,8 @@ a zone or enable zone 5.
 - Per-zone: power, source, volume (set/step), mute (emulated), bass, treble, balance, loudness, turn-on volume.
 - Global: All Zones On, All Zones Off, Resync.
 - State changes made at a keypad show up in HA within a few seconds.
-- Zero-config discovery in HA. Wi-Fi provisioning via captive portal. OTA firmware updates.
+- Zero-config discovery in HA. Ethernet (PoE) networking with Wi-Fi fallback; Wi-Fi provisioning via captive
+  portal. OTA firmware updates.
 - Users choose which zones and sources are enabled, and their names, in the HA UI.
 - Integration is structured so it can be published on HACS.
 
@@ -43,38 +44,46 @@ a zone or enable zone 5.
 - Multiple linked controllers (protocol supports up to 6; design should not preclude it).
 - Do Not Disturb, Party Mode, Background Color. Per the protocol's feature table these are not
   supported on the CAA6.6, and all-zone-info marks Party/DND as unavailable on CAS44/CAA66.
-- Ethernet/PoE hardware revision.
 - Getting the integration into HA core (that would require publishing the client as a PyPI library).
 
 ---
 
 ## 2. Hardware
 
-### 2.1 Bill of materials (v1 — parts on hand)
+**Board change (decision 2026-11-02).** The hardware is an Olimex ESP32-POE-ISO with an Olimex MOD-RS232
+attached by a UEXT ribbon cable. This replaces the ESP32 D1 Mini + generic MAX3232 module in earlier drafts.
+Networking is Ethernet with Wi-Fi fallback (§4.4).
+
+### 2.1 Bill of materials (v1)
 | Part | Notes |
 |---|---|
-| ESP32 "D1 Mini" style board, USB-C (ESP32-WROOM) | PlatformIO board: `wemos_d1_mini32` (verify against the actual module) |
-| MAX3232 RS232↔TTL module with **female** DB9 | Powered at 3.3 V |
-| DB9 cable/adapter — **likely male-to-male null-modem** | See §2.3 |
-| 5 V USB-C power supply | Near the controller |
+| Olimex ESP32-POE-ISO, rev J or later (ESP32-WROOM-32 variant) | PlatformIO board `esp32-poe-iso`. LAN8720 Ethernet PHY, isolated PoE, micro-USB (CH340-family USB-serial) for flashing. The enclosure is drawn for rev J+. The WROVER variant needs pin changes (Olimex note) and is not supported |
+| Olimex MOD-RS232, rev A | TI MAX3232 level shifter with DB9. Connects to the board's UEXT header with a UEXT ribbon cable and is powered from UEXT 3.3 V |
+| DB9 cable to the controller | Gender and straight vs null-modem depend on the MOD-RS232's DB9 (§2.3) |
+| Power: PoE (802.3af) switch or injector | PoE needs at least 37 V. The PoE side is galvanically isolated from the board. 5 V over micro-USB also works |
 
-### 2.2 Wiring (ESP32 ↔ MAX3232)
-| ESP32 | MAX3232 module | Notes |
+### 2.2 Wiring (ESP32-POE-ISO ↔ MOD-RS232)
+The UEXT ribbon cable carries 3.3 V, GND and the UART. Firmware uses UART2 on the UEXT UART pins:
+
+| ESP32 | UEXT signal | Notes |
 |---|---|---|
-| 3V3 | VCC | Do **not** use 5 V; keep TTL levels at 3.3 V |
-| GND | GND | |
-| GPIO17 (UART2 TX) | TXD / TX (TTL input to the module) | Pins configurable in firmware build flags |
-| GPIO16 (UART2 RX) | RXD / RX (TTL output from the module) | |
+| GPIO4 (UART2 TX) | TXD (output from the ESP32) | From Olimex's demo `Serial2.begin(..., 36, 4)` ("UEXT UART"). **Verify against the board schematic** |
+| GPIO36 (UART2 RX) | RXD (input to the ESP32) | Same source. GPIO36 is input-only |
 
-Module silkscreens vary in whether "TX" means "connect your TX here" or "this module's TX". If no
-traffic is seen during bring-up, swap the two TTL lines. This is harmless.
+Because GPIO36 is input-only, TX and RX **cannot be swapped in firmware**. If no traffic is seen during
+bring-up, use the MOD-RS232's RX/TX swap SMD jumpers instead.
+
+Pins taken by Ethernet (Olimex demo, tested with Arduino core 3.3.8); do not use them for anything else:
+PHY LAN8720 at address 0, GPIO17 = 50 MHz RMII clock **output** (`ETH_CLOCK_GPIO17_OUT`), GPIO12 = PHY power,
+GPIO23 = MDC, GPIO18 = MDIO, plus the ESP32's fixed RMII data pins (GPIO19, 21, 22, 25, 26, 27). Keep the PHY
+powered off (GPIO12 low) until the clock on GPIO17 is running, per Olimex. GPIO34 is the user button.
 
 ### 2.3 RS-232 side (module ↔ controller)
 - Controller port: female DB9. Pin 2 = controller **transmit**, pin 3 = controller **receive**,
   pin 5 = ground (protocol doc §3.2; the doc's "DB-96" is a typo). This is DCE-style wiring, which
   is why a straight cable to the Moxa (a male DTE device) works today.
-- The MAX3232 module is also female and usually DCE-wired, so a **male-to-male null-modem** (2↔3
-  crossed, 5↔5) is expected.
+- The MOD-RS232's DB9 gender and DTE/DCE wiring are **not confirmed** (the Olimex schematic was not checked).
+  Look at the connector and measure it as below before choosing a cable.
 - **Verify before buying:** with each device powered, measure DB9 pins 2 and 3 against pin 5. The
   transmit pin idles at roughly −5 to −9 V, and the receive pin reads near 0 V. Wire each transmit pin
   to the other device's receive pin.
@@ -242,12 +251,15 @@ Checksum example (doc)    F0 00 67 7C F1 0F 59 F7
 ## 4. Firmware
 
 ### 4.1 Platform
-- PlatformIO, `espressif32` platform, **Arduino framework**, board `wemos_d1_mini32`.
+- PlatformIO, `espressif32` platform, **Arduino framework**, board `esp32-poe-iso`.
+- Olimex's Ethernet example targets Arduino core 3.x (`ETH.begin(type, addr, mdc, mdio, power, clk_mode)`).
+  The current platform pin (`espressif32@7.1.3`) bundles core 2.0.17, whose `ETH.begin` takes its arguments in
+  a different order. Settle the core version at M4, when the network libraries are added.
 - Libraries (pin versions in `platformio.ini`):
   - `ESP32Async/ESPAsyncWebServer` + `ESP32Async/AsyncTCP` (maintained forks) — HTTP + WebSocket
   - `bblanchon/ArduinoJson` v7
-  - `tzapu/WiFiManager` — captive-portal provisioning
-  - Built-in: `ESPmDNS`, `Preferences` (NVS), `Update` (OTA), `ArduinoOTA` (dev convenience)
+  - `tzapu/WiFiManager` — captive-portal provisioning for the Wi-Fi fallback
+  - Built-in: `ETH` (LAN8720), `ESPmDNS`, `Preferences` (NVS), `Update` (OTA), `ArduinoOTA` (dev convenience)
 - Environments: `esp32` (device) and `native` (host unit tests with Unity, for the codec and engine logic).
 
 ### 4.2 Module layout (`firmware/`)
@@ -262,7 +274,7 @@ firmware/
     rnet_engine.{h,cpp}       # queue, single-outstanding request, timeouts, ACKs, polling scheduler, link state
     zone_model.{h,cpp}        # 6-zone state cache, change detection, mute emulation
   src/net/
-    wifi_setup.{h,cpp}        # WiFiManager portal, hostname, double-reset detection
+    network.{h,cpp}           # Ethernet first, Wi-Fi fallback, WiFiManager portal, hostname, double-reset detection
     api_server.{h,cpp}        # WebSocket + HTTP endpoints, JSON (de)serialization
     mdns.{h,cpp}
     ota.{h,cpp}
@@ -284,12 +296,22 @@ host with a scripted fake controller.
   (someone changed volume at the keypad). Mute state is RAM-only. It resets on reboot, which is acceptable.
 - Volume up/down commands are applied as set-volume ±1 (raw units) on the cached value, clamped to 0–50.
 
-### 4.4 Provisioning & settings
-- First boot, or no saved credentials: start an AP `RNET-Bridge-XXXX` (last 4 of MAC) with a captive portal.
-  Fields: Wi-Fi SSID/password, hostname (default `rnet-bridge-xxxx`), optional API token, OTA password.
+### 4.4 Network, provisioning & settings
+**Ethernet first, Wi-Fi fallback (decision 2026-11-02).** The detailed rules below are a proposal. Confirm them
+before M4.
+- Ethernet (DHCP) is the primary interface and needs no setup.
+- At boot, if Ethernet has no link and IP within 10 s (configurable), connect to Wi-Fi with the saved credentials.
+- While on Wi-Fi, keep watching Ethernet. When it has an IP, switch to it and disconnect Wi-Fi. If Ethernet drops,
+  fall back to Wi-Fi again. The device serves on one interface at a time.
+- Re-announce mDNS on every interface change. The address changes, and the integration follows it through
+  zeroconf rediscovery (§5.3).
+- Captive portal: start an AP `RNET-Bridge-XXXX` (last 4 of MAC) when there is no Ethernet and either no saved
+  Wi-Fi credentials or Wi-Fi fails to connect for 60 s. A board running on Ethernet with no Wi-Fi saved does not
+  start the portal. Portal fields: Wi-Fi SSID/password, hostname (default `rnet-bridge-xxxx`), optional API token,
+  OTA password.
 - Settings are stored in NVS (`Preferences`).
-- Factory reset / re-enter portal: **double-reset detection** (press reset twice within 3 s), because many D1 Mini ESP32
-  boards have no user button. Also expose a `factory_reset` HTTP endpoint (authenticated).
+- Factory reset / re-enter portal: **double-reset detection** (press reset twice within 3 s), which also forces
+  the portal so Wi-Fi can be set while Ethernet is connected. Also expose a `factory_reset` HTTP endpoint (authenticated).
 
 ### 4.5 Network API (contract — also written to `docs/protocol.md`)
 **Discovery:** mDNS service `_rnetbridge._tcp`, port 80. TXT records: `id` (MAC-based, stable),
@@ -528,8 +550,9 @@ entity translations, diagnostics, reauth if a token is added later, unavailable 
 ## 9. Milestones / bring-up plan
 Each milestone ends in something testable. Hardware steps need the human.
 
-- **M0 — Wiring.** Verify DB9 pinout with a multimeter (§2.3) and obtain the right cable. Do a MAX3232 loopback test
-  (short DB9 pins 2–3, echo bytes from the ESP32).
+- **M0 — Wiring.** Confirm the UEXT UART pins (§2.2, §11 item 11). Verify the MOD-RS232 and controller DB9
+  pinouts with a multimeter (§2.3) and obtain the right cable. Do a MOD-RS232 loopback test (short DB9 pins 2–3,
+  echo bytes from the ESP32).
 - **M1 — Codec.** `lib/rnet` codec + message builders/parsers + native tests passing on all vectors.
 - **M2 — First contact.** Firmware in "serial console" mode: commands typed over USB serial send frames,
   and all RX frames are hex-dumped and decoded. Confirm: Zone 1 power on/off works, all-zone-info reply parses,
@@ -538,7 +561,7 @@ Each milestone ends in something testable. Hardware steps need the human.
   `docs/rnet-notes.md` and update the constants.
 - **M3 — Engine.** Queue, ACKs, polling, link state, zone model, mute emulation. Keypad changes show up in the
   USB-serial state dump within one poll cycle.
-- **M4 — Network.** WiFiManager portal, NVS settings, mDNS, `/api/info`, WebSocket API per `docs/protocol.md`,
+- **M4 — Network.** Ethernet with Wi-Fi fallback (§4.4), WiFiManager portal, NVS settings, mDNS, `/api/info`, WebSocket API per `docs/protocol.md`,
   status page, OTA. Exercise with `tools/rnet_cli.py`.
 - **M5 — Integration skeleton.** `fake_bridge.py`, `api.py`, coordinator, config flow (zeroconf + manual), controller device.
   Create `hacs.json`, a complete `manifest.json`, placeholder brand icons, and `validate.yml` **now**, so HACS/hassfest
@@ -546,7 +569,8 @@ Each milestone ends in something testable. Hardware steps need the human.
 - **M6 — Entities.** Media players, numbers, switch, buttons, sensors; options flow for zones/sources; stale-device cleanup.
 - **M7 — Polish & release.** Diagnostics, translations, `send_raw`, repair issue for proto mismatch, final brand icons,
   README with HACS install instructions, `release.yml`, first GitHub Release `v0.1.0` installed via HACS on the real HA instance.
-- **M8 — Hardening.** Soak test; Wi-Fi drop and controller power-cycle recovery; HA restart; firmware OTA from HA host.
+- **M8 — Hardening.** Soak test; Ethernet unplug/replug (fallback to Wi-Fi and back), Wi-Fi drop, and controller
+  power-cycle recovery; HA restart; firmware OTA from HA host.
 
 ---
 
@@ -556,7 +580,7 @@ Each milestone ends in something testable. Hardware steps need the human.
 - Bass, treble, balance, loudness, and turn-on volume can be read and set from the zone device page.
 - A change made at the keypad appears in HA within 5 s.
 - Enabling/disabling zones or sources and renaming them in the options flow requires no firmware change.
-- After a controller power cycle, a Wi-Fi outage, or an HA restart, everything recovers without manual action.
+- After a controller power cycle, an Ethernet or Wi-Fi outage, or an HA restart, everything recovers without manual action.
 - No 2.5 s stalls during normal operation (`duplicate_replies` stays at 0 in the soak test).
 - Native tests and integration tests pass in CI. hassfest and HACS validation pass.
 - The integration installs, updates, and uninstalls cleanly through HACS as a custom repository from a GitHub Release,
@@ -582,3 +606,8 @@ Each milestone ends in something testable. Hardware steps need the human.
    does anything. If not, drop or hide the All Zones On button (§5.4).
 10. **Get Volume reply value.** Check whether PDF §8.3.2's "Volume Level -1" is real, by comparing it against
     all-zone-info byte 23. This only matters if discrete Get Volume is ever used.
+11. **UEXT UART pins (M0).** §2.2 takes TX = GPIO4 and RX = GPIO36 from Olimex demo code, not the schematic.
+    Confirm against the ESP32-POE-ISO schematic, or by loopback on the real board.
+12. **MOD-RS232 DB9 (M0).** Gender and DTE/DCE wiring, which decide the cable (§2.3).
+13. **`/api/info` on Ethernet (M4).** `wifi_rssi` has no meaning on Ethernet. Decide whether to send `null` or add
+    an interface field. Either changes the contract, so `docs/protocol.md` and `proto` rules apply.

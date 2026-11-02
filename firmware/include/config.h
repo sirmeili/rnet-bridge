@@ -10,9 +10,12 @@ namespace config {
 
 constexpr const char* kFirmwareVersion = "0.0.1";
 
-// UART2 to the MAX3232 module (SPEC §2.2, §2.4). Swap RX/TX if no traffic is seen during bring-up.
-constexpr int kRnetRxPin = 16;
-constexpr int kRnetTxPin = 17;
+// UART2 on the ESP32-POE-ISO's UEXT header, to the MOD-RS232 (SPEC §2.2, §2.4).
+// TODO(SPEC §11.11): unverified. Taken from Olimex demo code, not the schematic. Confirm in M0.
+// GPIO36 is input-only, so RX/TX can't be swapped here: use the MOD-RS232's swap jumpers.
+// GPIO17 is the Ethernet RMII clock on this board and must not be used.
+constexpr int kRnetRxPin = 36;
+constexpr int kRnetTxPin = 4;
 constexpr uint32_t kRnetBaud = 19200;  // 8N1, no flow control
 
 constexpr uint32_t kUsbSerialBaud = 115200;

@@ -1,6 +1,6 @@
 # RNET Bridge
 
-An ESP32 + MAX3232 bridge for Russound RNET controllers (target: CAA6.6). It plugs into the controller's RS-232
+An Olimex ESP32-POE-ISO + MOD-RS232 bridge for Russound RNET controllers (target: CAA6.6). It plugs into the controller's RS-232
 port and exposes it over a WebSocket/JSON API. A companion Home Assistant custom integration (`rnet_bridge`)
 turns each zone into a media player, with tone and turn-on-volume controls.
 
