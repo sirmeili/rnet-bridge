@@ -12,6 +12,7 @@ constexpr const char* kFirmwareVersion = "0.0.2";
 
 // UART1 to the Olimex MOD-RS232 via the UEXT connector (SPEC §2.2, §2.4): UEXT pin 3 = GPIO4 (TX),
 // UEXT pin 4 = GPIO36 (RX, input-only). Verified against the ESP32-POE-ISO Rev O schematic.
+// GPIO36 can't transmit, so RX/TX can't be swapped here. GPIO17 is the Ethernet clock; don't use it.
 constexpr int kRnetRxPin = 36;
 constexpr int kRnetTxPin = 4;
 constexpr uint32_t kRnetBaud = 19200;  // 8N1, no flow control

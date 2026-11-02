@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## What this repo is
-RNET Bridge: an ESP32 + MAX3232 device that plugs into a Russound RNET controller's RS-232 port (target:
+RNET Bridge: an Olimex ESP32-POE-ISO + MOD-RS232 device that plugs into a Russound RNET controller's RS-232 port (target:
 CAA6.6). It exposes the controller over a WebSocket/JSON API, alongside a Home Assistant custom integration
 (`rnet_bridge`) that turns each zone into a media player plus tone/config entities.
 
@@ -13,6 +13,7 @@ milestone, and do not jump ahead to later milestones unless asked.
 - `firmware/` — PlatformIO, Arduino framework, board `esp32-poe-iso`
   - `lib/rnet/` — pure C++ protocol code (codec, messages, engine, zone model). **No Arduino headers here.**
 - `custom_components/rnet_bridge/` — HA integration (Python, asyncio)
+- `hardware/enclosure/` — 3D-printable case (OpenSCAD) and viewer `manifest.json`; see its README
 - `tools/` — `fake_bridge.py` (simulated bridge), `rnet_decode.py`, `rnet_cli.py`
 - `tests/` — pytest for the integration
 - `docs/SPEC.md` — project specification ("SPEC §x" in this file refers to its sections)
@@ -82,9 +83,11 @@ python tools/fake_bridge.py --port 8080
 
 ## Hardware notes (for context)
 - Board: Olimex ESP32-POE-ISO (WROOM, 4 MB), PlatformIO `esp32-poe-iso`, CH340 USB-serial. RS-232 via Olimex
-  MOD-RS232 on the UEXT connector (SPEC §2).
+  MOD-RS232 on the UEXT connector (SPEC §2). Network: Ethernet first, Wi-Fi fallback (SPEC §4.4).
 - UART1: GPIO4 TX, GPIO36 RX (input-only) → MOD-RS232 (MAX3232, 3.3 V). 19200 8N1, no flow control.
   GPIO16/17 are not available (GPIO17 is the Ethernet clock).
+- Ethernet owns GPIO17 (RMII clock out), GPIO12 (PHY power), GPIO23/18 (MDC/MDIO) and the RMII data pins. Don't
+  reuse them (SPEC §2.2).
 - Controller DB9: pin 2 TX, pin 3 RX, pin 5 GND. Both it and the MOD-RS232 transmit on pin 2, so a male-to-male
   null-modem cable is required (SPEC §2.3).
 - The controller's port supports one client only. The old Moxa/`russound_rnet` setup must be disconnected.
