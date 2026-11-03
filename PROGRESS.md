@@ -8,21 +8,17 @@
   disabled by default.
 
 ## In progress
-- `feat/m3-engine` (M3, SPEC §9):
-  - Done: `zone_model` (18 native tests), `rnet_engine` (28 native tests against a scripted fake controller), the
-    `esp32` env running the engine with a USB state dump and commands (`usb_cli`), and the M2 console moved to its
-    own `esp32-console` env (also built in CI).
-  - Checks so far: `pio test -e native` 100/100, and `pio run -e esp32` / `-e esp32-console` both succeed with no
-    warnings.
-  - **Hardware check passed (2026-11-02)**, recorded in `docs/rnet-notes.md` ("M3 engine check"). Keypad changes
-    reached the state dump within one poll cycle, and every USB command was confirmed by the priority poll about
-    190 ms later. Zero checksum errors, timeouts or retries. Also found: an off zone's reported volume equals its
-    turn-on volume (SPEC §3.4).
-  - Board left with the engine firmware, zone 1 on (source 2, volume 35), everything else as found.
-  - Next: PR review and merge by the human.
+- `feat/m4-network` (M4, SPEC §9):
+  - Done: `docs/protocol.md` (proto 1 contract); engine raw sends and frame tap; `lib/bridge` (network policy,
+    double reset, API JSON); `src/net` (Ethernet, Wi-Fi fallback, portal, API server, mDNS, OTA, settings, log);
+    `tools/rnet_cli.py`. Firmware 0.0.3 on min_spiffs partitions.
+  - Checks so far: `pio test -e native` 133/133; `pio run -e esp32` (53% flash, 17% RAM) and `-e esp32-console`
+    succeed with no warnings; `rnet_cli.py` passes ruff and `mypy --strict`.
+  - Next: hardware tests with the human (Ethernet/PoE, mDNS, API, keypad push, Wi-Fi fallback, portal, OTA,
+    factory reset), then the PR.
 
 ## Next
-- M4 network (needs the open questions below settled). M5 onward can proceed without hardware using `fake_bridge.py`.
+- M5 integration skeleton. It can proceed without hardware using `fake_bridge.py`.
 
 ## Decisions
 - 2026-11-01: Run integration tests in Docker on this Windows machine. Home Assistant imports `fcntl`, so
@@ -35,6 +31,8 @@
   later rechecks.
 - 2026-11-02 (human): a command's result is `ok` once its frame is sent; the follow-up poll confirms it (SPEC §4.3).
 - 2026-11-02 (human): a volume step while muted steps from the stored volume and unmutes (SPEC §4.3).
+- 2026-11-03 (human): the SPEC §4.4 fallback rules as written; Arduino core stays 2.0.17; `/api/info` gains
+  `network`, with `wifi_rssi` null on Ethernet. `aiohttp` approved for `tools/`.
 
 ## Dev environment (Windows)
 - PlatformIO: `uv tool install platformio==6.2.0` (on PATH as `pio`).
@@ -49,9 +47,4 @@
 - The board shows up as COM4 (CH340) on this PC.
 
 ## Open questions
-- The fallback rules in SPEC §4.4 (10 s Ethernet wait, prefer Ethernet when it returns, when the portal starts) are
-  a proposal. Confirm them before M4.
-- SPEC §11 item 11: `wifi_rssi` in `/api/info` on Ethernet (M4).
-- Arduino core version for Ethernet: Olimex's example targets core 3.x, but the pinned platform has core 2.0.17.
-  Decide at M4.
 - Board revision printed on the PCB: not yet recorded in `docs/rnet-notes.md`.
