@@ -277,7 +277,9 @@ Checksum example (doc)    F0 00 67 7C F1 0F 59 F7
 - PlatformIO, `espressif32` platform, **Arduino framework**, board `esp32-poe-iso` (§2.1).
 - Olimex's Ethernet example targets Arduino core 3.x (`ETH.begin(type, addr, mdc, mdio, power, clk_mode)`).
   The current platform pin (`espressif32@7.1.3`) bundles core 2.0.17, whose `ETH.begin` takes its arguments in
-  a different order. Settle the core version at M4, when the network libraries are added.
+  a different order. **Decision (2026-11-03, human): stay on core 2.0.17** (the official PlatformIO platform,
+  already in CI), using 2.0.17's `ETH.begin(addr, power, mdc, mdio, type, clk_mode)`. Revisit if a library needs
+  3.x. The pinned libraries (ESPAsyncWebServer 3.12.1, AsyncTCP 3.5.0) support both cores.
 - Libraries (pin versions in `platformio.ini`):
   - `ESP32Async/ESPAsyncWebServer` + `ESP32Async/AsyncTCP` (maintained forks) — HTTP + WebSocket
   - `bblanchon/ArduinoJson` v7
@@ -331,8 +333,8 @@ host with a scripted fake controller.
   stored 30, volume up sends 31, not 1.
 
 ### 4.4 Network, provisioning & settings
-**Ethernet first, Wi-Fi fallback (decision 2026-11-02).** The detailed rules below are a proposal. Confirm them
-before M4.
+**Ethernet first, Wi-Fi fallback (decision 2026-11-02; the rules below were confirmed by the human on
+2026-11-03).**
 - Ethernet (DHCP) is the primary interface and needs no setup.
 - At boot, if Ethernet has no link and IP within 10 s (configurable), connect to Wi-Fi with the saved credentials.
 - While on Wi-Fi, keep watching Ethernet. When it has an IP, switch to it and disconnect Wi-Fi. If Ethernet drops,
@@ -348,13 +350,20 @@ before M4.
   the portal so Wi-Fi can be set while Ethernet is connected. Also expose a `factory_reset` HTTP endpoint (authenticated).
 
 ### 4.5 Network API (contract — also written to `docs/protocol.md`)
+**`docs/protocol.md` is the authoritative, detailed contract** (auth sequencing, every field, error names).
+This section is the summary. Changes 2026-11-03, when `protocol.md` was written for proto 1: `/api/info` adds
+`network` (`"ethernet"` | `"wifi"`), and `wifi_rssi` is `null` on Ethernet (human decision). `hello` adds
+`auth_required`. Result errors are `busy` | `invalid` | `link_down`; `timeout` is dropped, because the bridge
+never waits on the controller for a command, and the integration applies its own 5 s timeout. The `link` stats
+add `dropped` and `handshakes_rx`.
+
 **Discovery:** mDNS service `_rnetbridge._tcp`, port 80. TXT records: `id` (MAC-based, stable),
 `fw` (firmware version), `proto` (API protocol version, integer, starts at `1`).
 
 **HTTP:**
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/info` | `{id, name, fw, proto, model:"rnet", zones:6, sources:6, uptime_s, wifi_rssi}` |
+| GET | `/api/info` | `{id, name, fw, proto, model:"rnet", zones:6, sources:6, uptime_s, network, wifi_rssi}` |
 | POST | `/api/ota` | Firmware upload (multipart). Requires OTA password if set |
 | POST | `/api/factory_reset` | Clears settings, reboots into portal. Requires token if set |
 | GET | `/` | Minimal status page (link state, zones table, stats) for troubleshooting |
@@ -371,7 +380,7 @@ Server → client:
  "shared_source":false,"system_on":true}
 {"type":"link","up":true,"stats":{"tx":0,"rx":0,"checksum_errors":0,"timeouts":0,
  "retries":0,"duplicate_replies":0,"queue_depth":0}}
-{"type":"result","id":17,"ok":true}                        // or "ok":false,"error":"busy|invalid|link_down|timeout"
+{"type":"result","id":17,"ok":true}                        // or "ok":false,"error":"busy|invalid|link_down"
 {"type":"log","level":"debug","msg":"..."}               // only when subscribed
 {"type":"frame","dir":"rx","hex":"F0 00 ..."}            // only when frame tracing enabled
 ```
@@ -644,5 +653,5 @@ Items 1–10 were answered on hardware in M2 (2026-11-02). Evidence is in `docs/
 9. **All Zones On on the CAA6.6.** The PDF Quick Reference says it is unsupported on the CAA66. **Answered:** All
    On does nothing on the CAA6.6 tested; All Off works. The All Zones On button is disabled by default (§5.4).
 10. **Get Volume reply value.** Check whether PDF §8.3.2's "Volume Level -1" is real. **Answered:** no offset.
-11. **`/api/info` on Ethernet (M4).** `wifi_rssi` has no meaning on Ethernet. Decide whether to send `null` or add
-    an interface field. Either changes the contract, so `docs/protocol.md` and `proto` rules apply.
+11. **`/api/info` on Ethernet (M4).** `wifi_rssi` has no meaning on Ethernet. **Answered (2026-11-03, human):**
+    add `network: "ethernet" | "wifi"`, and send `wifi_rssi: null` on Ethernet (`docs/protocol.md`).
