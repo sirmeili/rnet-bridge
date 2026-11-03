@@ -102,6 +102,97 @@
     },
     "command_failed": {
       "message": "The RNET Bridge could not run {command}."
+    },
+    "unknown_source": {
+      "message": "{source} is not an enabled source. Enable it in the integration options."
+    }
+  },
+  "options": {
+    "step": {
+      "zones": {
+        "title": "Zones",
+        "description": "Choose which controller zones appear in Home Assistant, and name them. Disabled zones' devices are removed.",
+        "data": {
+          "1_enabled": "Zone 1",
+          "1_name": "Zone 1 name",
+          "2_enabled": "Zone 2",
+          "2_name": "Zone 2 name",
+          "3_enabled": "Zone 3",
+          "3_name": "Zone 3 name",
+          "4_enabled": "Zone 4",
+          "4_name": "Zone 4 name",
+          "5_enabled": "Zone 5",
+          "5_name": "Zone 5 name",
+          "6_enabled": "Zone 6",
+          "6_name": "Zone 6 name"
+        }
+      },
+      "sources": {
+        "title": "Sources",
+        "description": "Choose which sources to offer, and name them. Disabled sources are hidden from source lists.",
+        "data": {
+          "1_enabled": "Source 1",
+          "1_name": "Source 1 name",
+          "2_enabled": "Source 2",
+          "2_name": "Source 2 name",
+          "3_enabled": "Source 3",
+          "3_name": "Source 3 name",
+          "4_enabled": "Source 4",
+          "4_name": "Source 4 name",
+          "5_enabled": "Source 5",
+          "5_name": "Source 5 name",
+          "6_enabled": "Source 6",
+          "6_name": "Source 6 name"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "rnet_link": {
+        "name": "RNET link"
+      }
+    },
+    "button": {
+      "all_on": {
+        "name": "All zones on"
+      },
+      "all_off": {
+        "name": "All zones off"
+      },
+      "resync": {
+        "name": "Resync"
+      }
+    },
+    "number": {
+      "bass": {
+        "name": "Bass"
+      },
+      "treble": {
+        "name": "Treble"
+      },
+      "balance": {
+        "name": "Balance"
+      },
+      "turn_on_volume": {
+        "name": "Turn-on volume"
+      }
+    },
+    "sensor": {
+      "checksum_errors": {
+        "name": "Checksum errors"
+      },
+      "timeouts": {
+        "name": "Timeouts"
+      },
+      "duplicate_replies": {
+        "name": "Duplicate replies"
+      }
+    },
+    "switch": {
+      "loudness": {
+        "name": "Loudness"
+      }
     }
   }
 }

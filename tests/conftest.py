@@ -53,12 +53,14 @@ def default_options() -> dict[str, Any]:
     }
 
 
-def make_entry(port: int, **data: Any) -> MockConfigEntry:
+def make_entry(
+    port: int, options: dict[str, Any] | None = None, **data: Any
+) -> MockConfigEntry:
     """A config entry for a bridge on 127.0.0.1:port."""
     return MockConfigEntry(
         domain=DOMAIN,
         unique_id=BRIDGE_ID,
         title=f"RNET Bridge {BRIDGE_ID[-4:]}",
         data={CONF_HOST: "127.0.0.1", CONF_PORT: port, **data},
-        options=default_options(),
+        options=options if options is not None else default_options(),
     )

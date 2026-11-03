@@ -11,6 +11,9 @@ SUPPORTED_PROTO: Final = 1
 DEFAULT_PORT: Final = 80
 NUM_ZONES: Final = 6
 NUM_SOURCES: Final = 6
+MAX_VOLUME: Final = 50  # raw volume / turn-on volume; keypads show x2 (0-100)
+MIN_TONE: Final = -10  # bass, treble, balance
+MAX_TONE: Final = 10
 
 CONF_ZONES: Final = "zones"
 CONF_SOURCES: Final = "sources"

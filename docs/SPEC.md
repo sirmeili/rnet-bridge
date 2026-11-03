@@ -506,6 +506,18 @@ Rules:
 - Commands await the `result` message (timeout 5 s). On error, raise `HomeAssistantError` with a translated message.
 - No optimistic state. Wait for the confirming `zone_state` (it arrives about 150 ms after the command thanks to the priority poll).
 
+Implementation notes (M6, 2026-11-03):
+- **`source` is `None` while a zone is off**, because the controller's source byte isn't meaningful then (§3.4).
+  For the same reason, `volume_level` of an off zone shows its turn-on volume.
+- Selecting a source name that isn't enabled raises a translated `ServiceValidationError` (`unknown_source`).
+- The RNET Link binary sensor stays available while the WebSocket is connected, so a down link reads "off", not
+  "unavailable". The counters and buttons follow the same rule; buttons also need the link up.
+- **Zone device linking:** HA 2026.8 replaced `DeviceInfo.via_device` (identifier tuple, removed in 2027.8) with
+  `via_device_id` (registry id). The integration uses whichever the running HA has; 2026.3 only has the old one.
+- **`suggested_area`** is only set on HA before 2026.9, which deprecates it ("use code which ignores
+  suggested_area"). On newer HA, users assign areas themselves.
+- The RNET Link sensor and the counters update from the `link` push (on change and every 30 s); nothing polls.
+
 ### 5.5 Services
 - `rnet_bridge.send_raw` (developer/debug): `config_entry_id`, `hex`, `fix_checksum`. Logs the result.
 

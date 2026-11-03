@@ -1,0 +1,48 @@
+{
+  "entity": {
+    "button": {
+      "all_on": {
+        "default": "mdi:speaker-multiple"
+      },
+      "all_off": {
+        "default": "mdi:speaker-off"
+      },
+      "resync": {
+        "default": "mdi:sync"
+      }
+    },
+    "number": {
+      "bass": {
+        "default": "mdi:music-clef-bass"
+      },
+      "treble": {
+        "default": "mdi:music-clef-treble"
+      },
+      "balance": {
+        "default": "mdi:scale-balance"
+      },
+      "turn_on_volume": {
+        "default": "mdi:volume-medium"
+      }
+    },
+    "sensor": {
+      "checksum_errors": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "timeouts": {
+        "default": "mdi:timer-alert-outline"
+      },
+      "duplicate_replies": {
+        "default": "mdi:content-duplicate"
+      }
+    },
+    "switch": {
+      "loudness": {
+        "default": "mdi:equalizer",
+        "state": {
+          "off": "mdi:equalizer-outline"
+        }
+      }
+    }
+  }
+}
