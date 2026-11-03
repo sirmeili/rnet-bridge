@@ -138,6 +138,10 @@ void UsbCli::execute(char* line) {
     print_link();
   } else if (is("stats")) {
     print_stats();
+  } else if (is("net")) {
+    if (status_hook_ != nullptr) {
+      status_hook_(out_);
+    }
   } else if ((is("on") || is("off")) && has_zone) {
     submit(rnet::CommandType::kSetPower, z, is("on") ? 1 : 0);
   } else if (is("src") && has_zone && parse_int(argv[2], -999, 999, value)) {
@@ -221,6 +225,7 @@ void UsbCli::print_help() {
   out_.print(
       "Zones and sources are 1-based. Zone changes print automatically.\r\n"
       "  state | stats            all zones and link | counters\r\n"
+      "  net                      network status (interface, IP, Ethernet link, portal, heap)\r\n"
       "  on <z> | off <z>         zone power\r\n"
       "  src <z> <1-6>            select source\r\n"
       "  vol <z> <0-50>           set volume (raw; keypad shows x2)\r\n"

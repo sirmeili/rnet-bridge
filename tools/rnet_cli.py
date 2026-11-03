@@ -184,7 +184,7 @@ async def _run(args: argparse.Namespace) -> int:
             return 0 if result["ok"] else 1
 
 
-def _discover(seconds: float) -> int:
+def _discover(seconds: float, interface: str | None) -> int:
     try:
         from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
     except ImportError:
@@ -213,7 +213,7 @@ def _discover(seconds: float) -> int:
         def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
             print(f"removed {name}")
 
-    zc = Zeroconf()
+    zc = Zeroconf(interfaces=[interface]) if interface else Zeroconf()
     try:
         ServiceBrowser(zc, "_rnetbridge._tcp.local.", Listener())
         time.sleep(seconds)
@@ -233,6 +233,10 @@ def main() -> int:
 
     disc = sub.add_parser("discover", help="browse mDNS for bridges")
     disc.add_argument("--seconds", type=float, default=3.0)
+    disc.add_argument(
+        "--interface",
+        help="local IP to browse from (needed when other adapters, e.g. WSL, are present)",
+    )
 
     def host_parser(name: str, help_text: str) -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=help_text)
@@ -258,7 +262,7 @@ def main() -> int:
 
     args = parser.parse_args()
     if args.action == "discover":
-        return _discover(args.seconds)
+        return _discover(args.seconds, args.interface)
     try:
         return asyncio.run(_run(args))
     except (RuntimeError, aiohttp.ClientError, TimeoutError) as err:

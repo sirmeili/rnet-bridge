@@ -197,8 +197,10 @@ void Engine::on_frame(uint32_t now_ms) {
 
 void Engine::on_reply_to_us(RequestKind kind, uint8_t zone, uint32_t now_ms) {
   const bool expected = outstanding_.kind == kind && outstanding_.zone == zone;
-  // A reply nobody asked for that repeats the last one is a retransmission (SPEC §3.5).
-  if (remember_reply(kind, zone) && !expected) {
+  // A reply nobody asked for that repeats the last one is a retransmission (SPEC §3.5), unless a
+  // raw frame (which may have been a request) went out just before.
+  const bool after_raw = raw_sent_ && now_ms - raw_sent_ms_ < cfg_.request_timeout_ms;
+  if (remember_reply(kind, zone) && !expected && !after_raw) {
     ++stats_.duplicate_replies;
   }
   consecutive_timeouts_ = 0;
@@ -318,6 +320,8 @@ bool Engine::send_command(const Command& c, uint32_t now_ms) {
       return false;
     }
     transmit(slot.frame, now_ms);
+    raw_sent_ = true;
+    raw_sent_ms_ = now_ms;
     finish(c.id, CommandError::kNone);
     return true;
   }

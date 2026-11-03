@@ -650,6 +650,22 @@ void test_raw_frame_with_link_down_fails() {
   }
 }
 
+void test_reply_to_a_raw_request_is_not_a_duplicate() {
+  Rig r;
+  r.bring_up();
+  // A raw Get All Zone Info for zone 1, as `raw_send` would send it: the fake answers it.
+  WireFrame req{};
+  TEST_ASSERT_TRUE(rnet::build_get_all_zone_info(1, req));
+  r.engine.submit_raw(1, req.bytes, req.len);
+  r.run_for(100);
+  TEST_ASSERT_EQUAL_UINT32(0, r.engine.stats().duplicate_replies);
+  // A repeat long after the raw send still counts.
+  r.run_for(1000);
+  r.io.inject(zone_info_reply(2, true, 2, 23));
+  r.run_for(5);
+  TEST_ASSERT_EQUAL_UINT32(1, r.engine.stats().duplicate_replies);
+}
+
 struct TapLog {
   size_t tx = 0;
   size_t rx = 0;
@@ -716,6 +732,7 @@ int main() {
   RUN_TEST(test_raw_frame_is_sent_as_is);
   RUN_TEST(test_raw_frame_limits);
   RUN_TEST(test_raw_frame_with_link_down_fails);
+  RUN_TEST(test_reply_to_a_raw_request_is_not_a_duplicate);
   RUN_TEST(test_frame_tap_sees_both_directions);
   return UNITY_END();
 }

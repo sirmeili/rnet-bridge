@@ -188,6 +188,8 @@ class Engine {
     WireFrame frame;
   };
   RawSlot raw_[kRawSlots] = {};
+  bool raw_sent_ = false;
+  uint32_t raw_sent_ms_ = 0;
   FrameTap tap_ = nullptr;
   void* tap_ctx_ = nullptr;
 

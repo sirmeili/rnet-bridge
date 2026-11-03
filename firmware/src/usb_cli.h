@@ -15,6 +15,8 @@ class UsbCli {
          uint32_t id_bit);
 
   void begin();
+  // Prints extra status lines for the `net` command (the network lives outside the CLI).
+  void set_status_hook(void (*hook)(Print& out)) { status_hook_ = hook; }
   // Call every loop(), after Engine::tick(), with the zones and link change taken from the model
   // and engine this tick. Never blocks.
   void poll(uint32_t now_ms, uint8_t changed_zones, bool link_changed);
@@ -38,6 +40,7 @@ class UsbCli {
   rnet::Engine& engine_;
   const rnet::ZoneModel& model_;
   uint32_t id_bit_;
+  void (*status_hook_)(Print& out) = nullptr;
 
   char line_[kLineMax];
   size_t line_len_ = 0;

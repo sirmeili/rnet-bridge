@@ -68,10 +68,11 @@ void setup() {
   }
 
   g_lock = xSemaphoreCreateMutex();
-  g_network.begin(double_reset);  // sets the id used for the default hostname
   char default_hostname[24];
   std::snprintf(default_hostname, sizeof(default_hostname), "rnet-bridge-%s", Network::id_suffix());
-  g_settings.load(default_hostname);
+  g_settings.load(default_hostname);  // before the network: it sets the hostname
+  g_network.begin(double_reset);
+  g_cli.set_status_hook([](Print& out) { g_network.print_status(out); });
 
   g_api = new ApiServer(g_engine, g_model, g_network, g_settings, g_lock);  // once, at boot
   g_engine.set_frame_tap(&ApiServer::frame_tap, g_api);

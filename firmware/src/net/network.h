@@ -26,8 +26,11 @@ class Network {
   bool take_restart_requested();
   int wifi_rssi() const;
   String local_ip() const;
+  // One diagnostic line for the USB `net` command.
+  void print_status(Print& out) const;
 
   // Lowercase hex Ethernet MAC (stable bridge id, docs/protocol.md) and the last 4 hex digits.
+  // Available before begin().
   static const char* id();
   static const char* id_suffix();
 
@@ -42,4 +45,5 @@ class Network {
   bool sta_on_ = false;
   bool portal_running_ = false;
   bool has_credentials_ = false;
+  uint32_t eth_events_seen_ = 0;
 };

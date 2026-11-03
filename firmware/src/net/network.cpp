@@ -29,14 +29,25 @@ WiFiManagerParameter* g_p_token = nullptr;
 WiFiManagerParameter* g_p_ota = nullptr;
 bool g_restart_requested = false;
 
+// Runs on the system event task: only record, and let Network::loop() log.
+volatile bool g_eth_link = false;
+volatile uint32_t g_eth_events = 0;  // bumped on every Ethernet event
+
 void on_event(WiFiEvent_t event) {
   switch (event) {
+    case ARDUINO_EVENT_ETH_CONNECTED:
+      g_eth_link = true;
+      ++g_eth_events;
+      break;
     case ARDUINO_EVENT_ETH_GOT_IP:
       g_eth_has_ip = true;
+      ++g_eth_events;
       break;
     case ARDUINO_EVENT_ETH_DISCONNECTED:  // core 2.0.17 has no ETH_LOST_IP event
     case ARDUINO_EVENT_ETH_STOP:
+      g_eth_link = false;
       g_eth_has_ip = false;
+      ++g_eth_events;
       break;
     default:
       break;
@@ -50,16 +61,23 @@ void copy_param(char* dst, size_t cap, const WiFiManagerParameter* p) {
 
 }  // namespace
 
-const char* Network::id() { return g_id; }
-const char* Network::id_suffix() { return g_id_suffix; }
+const char* Network::id() {
+  if (g_id[0] == '\0') {
+    uint8_t mac[6] = {};
+    esp_read_mac(mac, ESP_MAC_ETH);
+    std::snprintf(g_id, sizeof(g_id), "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3],
+                  mac[4], mac[5]);
+    std::snprintf(g_id_suffix, sizeof(g_id_suffix), "%02x%02x", mac[4], mac[5]);
+  }
+  return g_id;
+}
+
+const char* Network::id_suffix() {
+  id();
+  return g_id_suffix;
+}
 
 void Network::begin(bool force_portal) {
-  uint8_t mac[6] = {};
-  esp_read_mac(mac, ESP_MAC_ETH);
-  std::snprintf(g_id, sizeof(g_id), "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3],
-                mac[4], mac[5]);
-  std::snprintf(g_id_suffix, sizeof(g_id_suffix), "%02x%02x", mac[4], mac[5]);
-
   WiFi.onEvent(on_event);
   WiFi.persistent(true);
   // The saved credentials can only be read with the Wi-Fi driver started. Read them once here: a
@@ -77,6 +95,11 @@ void Network::begin(bool force_portal) {
 }
 
 void Network::loop(uint32_t now_ms) {
+  if (g_eth_events != eth_events_seen_) {
+    eth_events_seen_ = g_eth_events;
+    LOG_INFO("network: Ethernet link %s, %s", g_eth_link ? "up" : "down",
+             g_eth_has_ip ? ETH.localIP().toString().c_str() : "no IP");
+  }
   const bridge::NetInputs in{g_eth_has_ip, sta_on_ && WiFi.status() == WL_CONNECTED,
                              has_credentials_};
   const bridge::NetPlan plan = policy_->update(now_ms, in);
@@ -173,6 +196,20 @@ bool Network::take_restart_requested() {
 }
 
 int Network::wifi_rssi() const { return WiFi.RSSI(); }
+
+void Network::print_status(Print& out) const {
+  out.printf("net serving=%s ip=%s eth_link=%s eth_ip=%s eth_events=%lu wifi_sta=%s wifi_status=%d "
+             "creds=%s portal=%s heap_free=%lu heap_min=%lu\r\n",
+             serving_ == bridge::Iface::kEthernet ? "ethernet"
+             : serving_ == bridge::Iface::kWifi   ? "wifi"
+                                                  : "none",
+             local_ip().c_str(), ETH.linkUp() ? "up" : "down",
+             g_eth_has_ip ? ETH.localIP().toString().c_str() : "-",
+             static_cast<unsigned long>(g_eth_events), sta_on_ ? "on" : "off",
+             static_cast<int>(WiFi.status()), has_credentials_ ? "yes" : "no",
+             portal_running_ ? "open" : "closed", static_cast<unsigned long>(ESP.getFreeHeap()),
+             static_cast<unsigned long>(ESP.getMinFreeHeap()));
+}
 
 String Network::local_ip() const {
   switch (serving_) {

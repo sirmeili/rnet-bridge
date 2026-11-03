@@ -14,14 +14,19 @@ void copy(char* dst, size_t cap, const String& src) {
   dst[cap - 1] = '\0';
 }
 
+// Preferences logs an error for a missing key; check first so a fresh board boots quietly.
+String get(Preferences& p, const char* key, const char* fallback) {
+  return p.isKey(key) ? p.getString(key, fallback) : String(fallback);
+}
+
 }  // namespace
 
 void Settings::load(const char* default_hostname) {
   Preferences p;
   p.begin(kNamespace, true);
-  copy(hostname, sizeof(hostname), p.getString("hostname", default_hostname));
-  copy(token, sizeof(token), p.getString("token", ""));
-  copy(ota_password, sizeof(ota_password), p.getString("ota_pw", ""));
+  copy(hostname, sizeof(hostname), get(p, "hostname", default_hostname));
+  copy(token, sizeof(token), get(p, "token", ""));
+  copy(ota_password, sizeof(ota_password), get(p, "ota_pw", ""));
   p.end();
   if (hostname[0] == '\0') {
     copy(hostname, sizeof(hostname), String(default_hostname));
@@ -48,7 +53,7 @@ void Settings::factory_reset() {
 bool Settings::double_reset_flag() {
   Preferences p;
   p.begin(kNamespace, true);
-  const bool on = p.getBool("dr", false);
+  const bool on = p.isKey("dr") && p.getBool("dr", false);
   p.end();
   return on;
 }
