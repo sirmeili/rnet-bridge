@@ -302,13 +302,19 @@ firmware/
     rnet_engine.{h,cpp}       # queue, single-outstanding request, timeouts, handshakes, polling scheduler, link state
     zone_model.{h,cpp}        # 6-zone state cache, change detection, mute emulation
     rnet_text, rnet_duplicate # hex/decode text and duplicate detection for the M2 console
+  lib/bridge/                 # PURE C++ network-side logic, native-tested
+    api_protocol.{h,cpp}      # proto 1 JSON encoders + client message parser (ArduinoJson)
+    network_policy.{h,cpp}    # Ethernet-first / Wi-Fi-fallback / portal rules (§4.4)
+    double_reset.h            # double-reset decision
   src/net/
-    network.{h,cpp}           # Ethernet first, Wi-Fi fallback, WiFiManager portal, hostname, double-reset detection
-    api_server.{h,cpp}        # WebSocket + HTTP endpoints, JSON (de)serialization
+    network.{h,cpp}           # applies network_policy: LAN8720 Ethernet, Wi-Fi station, WiFiManager portal, hostname
+    settings.{h,cpp}          # NVS: hostname, API token, OTA password, double-reset flag
+    api_server.{h,cpp}        # WebSocket + HTTP endpoints; WS events cross to the main loop via a FreeRTOS queue
     mdns.{h,cpp}
     ota.{h,cpp}
   src/platform/
     serial_port.h             # adapter between HardwareSerial and the engine's byte I/O interface
+                              # (the esp32 env uses the min_spiffs partition table: 2 x 1.9 MB OTA app slots)
     log.{h,cpp}               # ring buffer + level filtering, mirrored to USB serial and WS subscribers
   test/                       # Unity tests run with `pio test -e native`
 ```
@@ -345,6 +351,11 @@ host with a scripted fake controller.
   Wi-Fi credentials or Wi-Fi fails to connect for 60 s. A board running on Ethernet with no Wi-Fi saved does not
   start the portal. Portal fields: Wi-Fi SSID/password, hostname (default `rnet-bridge-xxxx`), optional API token,
   OTA password.
+- **While the portal is open, the API server is paused** (implementation note, 2026-11-03). WiFiManager's portal
+  runs its own web server on port 80, the same port as the API. This only happens with no network at all, or for
+  up to 5 minutes after a double reset. Saving the portal form restarts the bridge.
+- The rules live in `lib/bridge/network_policy` (pure C++, native-tested). Saved Wi-Fi credentials are read once
+  at boot, because the Wi-Fi driver is off while on Ethernet.
 - Settings are stored in NVS (`Preferences`).
 - Factory reset / re-enter portal: **double-reset detection** (press reset twice within 3 s), which also forces
   the portal so Wi-Fi can be set while Ethernet is connected. Also expose a `factory_reset` HTTP endpoint (authenticated).
