@@ -77,7 +77,8 @@ void UsbCli::poll(uint32_t now_ms) {
   }
   const uint8_t changed = model_.take_changed();
   for (uint8_t z = 1; z <= rnet::kNumZones; ++z) {
-    if (changed & (1u << (z - 1))) {
+    // A turn-on volume reply can arrive before the zone's first full poll: wait for that.
+    if ((changed & (1u << (z - 1))) && model_.zone(z).valid) {
       print_zone(z);
     }
   }

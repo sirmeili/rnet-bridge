@@ -244,3 +244,32 @@ RX F0 00 00 70 00 00 7F 00 00 04 02 00 00 01 00 00 01 00 01 00 23 20 F7
 
 Applied 2026-11-02 with the human's OK: `config::kSessionStartEvent = kNone`, `config::kSendDataAck = false`, the
 All Zones On entity disabled by default, and SPEC §3.3–§3.9 and §11 updated to match.
+
+## M3 engine check (2026-11-02)
+Firmware 0.0.2, `esp32` env (engine + USB state dump), on the same controller.
+
+**Boot:** link up 56 ms after reset. All six zones polled and turn-on volumes read within 2.6 s. 17 requests and 17
+replies, with no timeouts or retries.
+
+**Keypad changes reach the model within one poll cycle (≤ 3 s; the M3 done condition).** Zone 1 keypad, one
+press about every 10 s:
+
+| Pressed | State dump |
+|---|---|
+| Vol Up, Vol Up | `vol=36`, `vol=37` |
+| Vol Down ×2 | `vol=36`, `vol=35` |
+| Source ×4 | `src=3`, `src=4`, `src=2` |
+
+Source 1 lasted less than one poll cycle, so it was never sampled. Polling can miss states shorter than about
+3 s, which is acceptable.
+
+**Commands through the engine queue**, each confirmed by the priority poll about 190 ms after sending:
+`on 1`; `vol 1 30` → `35`; `mute 1 on` → `vol=0 MUTED` → `mute 1 off` → `vol=35`; `up 1` → 36 → `down 1` → 35;
+`set 1 bass 2` → `0`. The controller ACKed each Set Data (`handshakes_rx` +1 each). Everything was restored.
+
+**For a zone that is off, all-zone-info reports its turn-on volume as the volume.** All five off zones read
+`vol` equal to their turn-on volume. `set 2 tov 20` on the off zone 2 changed both the turn-on volume reply and the
+all-zone-info volume to 20; `set 2 tov 23` restored both.
+
+Counters over about 3 minutes: 392 tx, 427 rx, 0 checksum errors, 0 timeouts, 0 retries, 0 duplicate replies. One
+partial frame was dropped, during the board reset at the start.

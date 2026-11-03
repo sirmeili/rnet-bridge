@@ -181,7 +181,9 @@ F0 00 zz 70 00 00 7F 00 00 04 02 00 zz 07 00 00 01 00 0C 00 [d0..d10] 00 cs F7
 | 31 | DND (N/A on CAA6.6 — ignore) |
 
 The source byte is only meaningful while the zone is on. On the CAA6.6, a zone that was off read source 1, came
-on at source 4, and then read 4 when off again (`docs/rnet-notes.md` M2.3).
+on at source 4, and then read 4 when off again (`docs/rnet-notes.md` M2.3). **For a zone that is off, the volume
+byte reports the zone's turn-on volume**: setting zone 2's turn-on volume to 20 while it was off changed its
+all-zone-info volume to 20 as well (`docs/rnet-notes.md`, M3 check).
 
 Turn-on volume is **not** in all-zone-info. Fetch it with `Get zone param pp=04`. The reply, verified on
 hardware, is `F0 00 zz 70 00 00 7F 00 00 05 02 00 zz 00 04 00 00 01 00 01 00 vv cs F7`.

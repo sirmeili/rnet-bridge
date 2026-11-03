@@ -14,8 +14,12 @@
     own `esp32-console` env (also built in CI).
   - Checks so far: `pio test -e native` 100/100, and `pio run -e esp32` / `-e esp32-console` both succeed with no
     warnings.
-  - Next: hardware check with the human. Flash `esp32`, then confirm keypad changes show in the state dump within
-    one poll cycle (about 3 s), and that commands from the USB CLI work. Then open the PR.
+  - **Hardware check passed (2026-11-02)**, recorded in `docs/rnet-notes.md` ("M3 engine check"). Keypad changes
+    reached the state dump within one poll cycle, and every USB command was confirmed by the priority poll about
+    190 ms later. Zero checksum errors, timeouts or retries. Also found: an off zone's reported volume equals its
+    turn-on volume (SPEC §3.4).
+  - Board left with the engine firmware, zone 1 on (source 2, volume 35), everything else as found.
+  - Next: PR review and merge by the human.
 
 ## Next
 - M4 network (needs the open questions below settled). M5 onward can proceed without hardware using `fake_bridge.py`.
