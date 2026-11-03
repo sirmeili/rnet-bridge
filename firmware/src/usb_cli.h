@@ -10,12 +10,15 @@
 
 class UsbCli {
  public:
-  // Takes the model's change flags (ZoneModel::take_changed), so nothing else may consume them.
-  UsbCli(Print& out, Stream& in, rnet::Engine& engine, rnet::ZoneModel& model);
+  // Command ids carry `id_bit`, so main can route engine results back here (on_result).
+  UsbCli(Print& out, Stream& in, rnet::Engine& engine, const rnet::ZoneModel& model,
+         uint32_t id_bit);
 
   void begin();
-  // Call every loop(), after Engine::tick(). Never blocks.
-  void poll(uint32_t now_ms);
+  // Call every loop(), after Engine::tick(), with the zones and link change taken from the model
+  // and engine this tick. Never blocks.
+  void poll(uint32_t now_ms, uint8_t changed_zones, bool link_changed);
+  void on_result(const rnet::CommandResult& r);
 
  private:
   static constexpr size_t kLineMax = 80;
@@ -25,7 +28,6 @@ class UsbCli {
   void execute(char* line);
   void submit(rnet::CommandType type, uint8_t zone, int16_t value,
               rnet::ZoneParam param = rnet::ZoneParam::kBass);
-  void print_results();
   void print_zone(uint8_t zone);
   void print_link();
   void print_stats();
@@ -34,7 +36,8 @@ class UsbCli {
   Print& out_;
   Stream& in_;
   rnet::Engine& engine_;
-  rnet::ZoneModel& model_;
+  const rnet::ZoneModel& model_;
+  uint32_t id_bit_;
 
   char line_[kLineMax];
   size_t line_len_ = 0;

@@ -61,24 +61,23 @@ const char* on_off(bool b) { return b ? "on" : "off"; }
 
 }  // namespace
 
-UsbCli::UsbCli(Print& out, Stream& in, rnet::Engine& engine, rnet::ZoneModel& model)
-    : out_(out), in_(in), engine_(engine), model_(model) {}
+UsbCli::UsbCli(Print& out, Stream& in, rnet::Engine& engine, const rnet::ZoneModel& model,
+               uint32_t id_bit)
+    : out_(out), in_(in), engine_(engine), model_(model), id_bit_(id_bit) {}
 
 void UsbCli::begin() {
-  out_.printf("\r\nRNET Bridge %s: engine (M3). Type 'help'.\r\n", config::kFirmwareVersion);
+  out_.printf("\r\nRNET Bridge %s. Type 'help' for USB commands.\r\n", config::kFirmwareVersion);
 }
 
-void UsbCli::poll(uint32_t now_ms) {
+void UsbCli::poll(uint32_t now_ms, uint8_t changed_zones, bool link_changed) {
   now_ms_ = now_ms;
   read_input();
-  print_results();
-  if (engine_.take_link_changed()) {
+  if (link_changed) {
     print_link();
   }
-  const uint8_t changed = model_.take_changed();
   for (uint8_t z = 1; z <= rnet::kNumZones; ++z) {
     // A turn-on volume reply can arrive before the zone's first full poll: wait for that.
-    if ((changed & (1u << (z - 1))) && model_.zone(z).valid) {
+    if ((changed_zones & (1u << (z - 1))) && model_.zone(z).valid) {
       print_zone(z);
     }
   }
@@ -167,20 +166,19 @@ void UsbCli::execute(char* line) {
 }
 
 void UsbCli::submit(rnet::CommandType type, uint8_t zone, int16_t value, rnet::ZoneParam param) {
-  const uint32_t id = next_id_++;
-  const rnet::CommandError e = engine_.submit(rnet::Command{id, type, zone, value, param});
+  const uint32_t id = next_id_;
+  next_id_ = (next_id_ + 1) & ~id_bit_;
+  const rnet::CommandError e =
+      engine_.submit(rnet::Command{id | id_bit_, type, zone, value, param});
   if (e != rnet::CommandError::kNone) {
     out_.printf("[%8lu] cmd %lu: %s\r\n", static_cast<unsigned long>(now_ms_),
                 static_cast<unsigned long>(id), error_name(e));
   }
 }
 
-void UsbCli::print_results() {
-  rnet::CommandResult r{};
-  while (engine_.next_result(r)) {
-    out_.printf("[%8lu] cmd %lu: %s\r\n", static_cast<unsigned long>(now_ms_),
-                static_cast<unsigned long>(r.id), error_name(r.error));
-  }
+void UsbCli::on_result(const rnet::CommandResult& r) {
+  out_.printf("[%8lu] cmd %lu: %s\r\n", static_cast<unsigned long>(now_ms_),
+              static_cast<unsigned long>(r.id & ~id_bit_), error_name(r.error));
 }
 
 void UsbCli::print_zone(uint8_t zone) {
