@@ -3,15 +3,16 @@
 Examples:
     python tools/rnet_cli.py discover
     python tools/rnet_cli.py info rnet-bridge-e5f6.local
-    python tools/rnet_cli.py watch 192.168.1.50            # snapshot, then live zone/link updates
+    python tools/rnet_cli.py watch 192.168.1.50     # snapshot, then live updates
     python tools/rnet_cli.py cmd 192.168.1.50 set_volume 1 30
     python tools/rnet_cli.py cmd 192.168.1.50 set_power 2 true
     python tools/rnet_cli.py cmd 192.168.1.50 refresh
     python tools/rnet_cli.py logs 192.168.1.50 --level debug
     python tools/rnet_cli.py frames 192.168.1.50
-    python tools/rnet_cli.py raw 192.168.1.50 "F0 00 00 7F 00 00 70 01 04 02 00 00 07 00 00" --fix
+    python tools/rnet_cli.py raw 192.168.1.50 --fix "F0 00 00 7F 00 00 70 01 04"
 
-Pass --token if the bridge has an API token. Requires aiohttp (tools/requirements.txt).
+Pass --token if the bridge has an API token.
+Requires aiohttp (tools/requirements.txt).
 """
 
 from __future__ import annotations
@@ -38,8 +39,9 @@ def _zone_line(z: dict[str, Any]) -> str:
         return f"z{z['zone']} (not polled yet)"
     tov = z.get("turn_on_volume")
     return (
-        f"z{z['zone']} {'on ' if z['power'] else 'off'} src={z['source']} vol={z['volume']:>2}"
-        f"{' MUTED' if z['muted'] else ''} bass={z['bass']} treble={z['treble']} bal={z['balance']}"
+        f"z{z['zone']} {'on ' if z['power'] else 'off'} src={z['source']}"
+        f" vol={z['volume']:>2}{' MUTED' if z['muted'] else ''}"
+        f" bass={z['bass']} treble={z['treble']} bal={z['balance']}"
         f" loud={'on' if z['loudness'] else 'off'} tov={'?' if tov is None else tov}"
         f" sys={'on' if z['system_on'] else 'off'}"
     )
@@ -83,15 +85,15 @@ class Session:
         self.ws = ws
         self.next_id = 1
 
-    async def receive(self, timeout: float | None = None) -> dict[str, Any] | None:
-        msg = await self.ws.receive(timeout=timeout)
+    async def receive(self, wait: float | None = None) -> dict[str, Any] | None:
+        msg = await self.ws.receive(timeout=wait)
         if msg.type != aiohttp.WSMsgType.TEXT:
             return None
         data: dict[str, Any] = json.loads(msg.data)
         return data
 
     async def start(self, token: str | None) -> dict[str, Any]:
-        hello = await self.receive(timeout=5)
+        hello = await self.receive(wait=5)
         if hello is None or hello.get("type") != "hello":
             raise RuntimeError(f"expected hello, got {hello}")
         if hello.get("proto") != PROTO:
@@ -102,19 +104,19 @@ class Session:
             if not token:
                 raise RuntimeError("the bridge needs --token")
             await self.ws.send_json({"type": "auth", "token": token})
-        snapshot = await self.receive(timeout=5)
+        snapshot = await self.receive(wait=5)
         if snapshot is None or snapshot.get("type") != "snapshot":
             raise RuntimeError(f"expected snapshot, got {snapshot}")
         return snapshot
 
     async def request(self, message: dict[str, Any]) -> dict[str, Any]:
-        """Sends a command or raw_send and waits for its result, printing anything else."""
+        """Send a command or raw_send; wait for its result, printing anything else."""
         msg_id = self.next_id
         self.next_id += 1
         await self.ws.send_json({**message, "id": msg_id})
         deadline = time.monotonic() + RESULT_TIMEOUT_S
         while (left := deadline - time.monotonic()) > 0:
-            msg = await self.receive(timeout=left)
+            msg = await self.receive(wait=left)
             if msg is None:
                 break
             if msg.get("type") == "result" and msg.get("id") == msg_id:
@@ -171,11 +173,11 @@ async def _run(args: argparse.Namespace) -> int:
             result = await session.request(message)
             _print_message(result)
             if result["ok"]:
-                # The confirming zone_state follows the priority poll about 150 ms later.
+                # The confirming zone_state follows the priority poll ~150 ms later.
                 end = time.monotonic() + 1.0
                 while (left := end - time.monotonic()) > 0:
                     try:
-                        msg = await session.receive(timeout=left)
+                        msg = await session.receive(wait=left)
                     except TimeoutError:
                         break
                     if msg is None:
@@ -235,7 +237,7 @@ def main() -> int:
     disc.add_argument("--seconds", type=float, default=3.0)
     disc.add_argument(
         "--interface",
-        help="local IP to browse from (needed when other adapters, e.g. WSL, are present)",
+        help="local IP to browse from (when other adapters, e.g. WSL, exist)",
     )
 
     def host_parser(name: str, help_text: str) -> argparse.ArgumentParser:

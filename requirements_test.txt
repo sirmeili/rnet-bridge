@@ -1,0 +1,5 @@
+# Integration tests and checks (CLAUDE.md "Commands"). The integration itself has no requirements.
+# pytest-homeassistant-custom-component pins homeassistant (2026.10.4 for this version) and pytest.
+pytest-homeassistant-custom-component==0.13.375
+ruff==0.17.3
+mypy==2.4.1

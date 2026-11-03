@@ -12,7 +12,11 @@ turns each zone into a media player, with tone and turn-on-volume controls.
 | Path | Contents |
 |---|---|
 | `firmware/` | ESP32 firmware (PlatformIO, Arduino). `lib/rnet/` is the host-testable protocol library |
+| `custom_components/rnet_bridge/` | Home Assistant integration (in progress) |
+| `tools/` | `fake_bridge.py` (simulated bridge), `rnet_cli.py` (terminal client) |
+| `tests/` | Integration tests (pytest) |
 | `docs/SPEC.md` | Project specification |
+| `docs/protocol.md` | Network API contract between the firmware and the integration |
 | `docs/reference/` | Russound's RNET protocol document, with an annotated Markdown transcription |
 
 ## Firmware development

@@ -45,3 +45,45 @@ jobs:
 
       - name: Build M2 bring-up console
         run: pio run -e esp32-console
+
+  integration:
+    name: Integration (ruff, mypy, pytest on current HA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+
+      - name: Install test requirements
+        run: pip install -r requirements_test.txt
+
+      - name: ruff
+        run: ruff check . && ruff format --check .
+
+      - name: mypy
+        run: mypy custom_components/rnet_bridge tools
+
+      - name: pytest
+        run: pytest tests/
+
+  integration-minimum:
+    # hacs.json says "homeassistant": "2026.3.0"; 0.13.317 is the earliest test
+    # plugin for 2026.3 (it pins homeassistant 2026.3.1).
+    name: Integration (pytest on HA 2026.3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install the 2026.3 test plugin
+        run: pip install pytest-homeassistant-custom-component==0.13.317
+
+      - name: pytest
+        run: pytest tests/
