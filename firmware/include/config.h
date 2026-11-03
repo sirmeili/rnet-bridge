@@ -29,8 +29,8 @@ constexpr uint32_t kUsbSerialBaud = 115200;
 // ACK at all.
 constexpr uint8_t kDataHandshakeType = 0x02;
 
-// TODO(SPEC §11.2): unverified. Whether the CAA6.6 needs/accepts the Device Restart event before
-// zone Get/Set works. Determine in M2; switch to kNone (or a different event) if it is ignored.
-constexpr rnet::SessionStartEvent kSessionStartEvent = rnet::SessionStartEvent::kDeviceRestart;
+// SPEC §11.2, verified 2026-11-02 (docs/rnet-notes.md M2.2): the CAA6.6 answers zone Get/Set with no
+// session-start event, including as the first frame after a controller power-cycle. Send nothing.
+constexpr rnet::SessionStartEvent kSessionStartEvent = rnet::SessionStartEvent::kNone;
 
 }  // namespace config

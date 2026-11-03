@@ -13,8 +13,8 @@
     retransmitted. The controller was left as found: zone 1 on, source 2, volume 35, bass 0.
   - The keypad's power button is broken (hardware). It never sends `6C`.
   - Proposed follow-ups, **waiting for the human's OK**:
-    - `config::kSessionStartEvent` → `kNone` (no session start was needed). Optionally confirm first with
-      `info 1` straight after a controller power-cycle, with no keypad use.
+    - Done 2026-11-02 (human OK): `config::kSessionStartEvent` → `kNone`, after a clean power-cycle test. Nothing
+      uses the constant yet; the M3 engine will.
     - M3 engine: don't send data ACKs (not needed for keypad `0x70`). Treat the controller's `02` handshake after
       our Set Data as a link-health signal (SPEC §3.5).
     - SPEC §5.4: drop or hide the All Zones On button (it does nothing on this CAA6.6).

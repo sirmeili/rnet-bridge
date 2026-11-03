@@ -99,8 +99,15 @@ For a clean test, power-cycle the controller first, so it has seen no events sin
 Record which step first produced a reply. That decides `config::kSessionStartEvent`.
 
 Result (2026-11-02): **step 1 replied, with no session-start event.** The bridge had transmitted nothing before
-this (`tx=0`). Caveat: the controller had not been power-cycled immediately before, and it had seen keypad
-events since its last boot. Repeat after a power-cycle with no keypad use to be certain. This also confirms
+this (`tx=0`). The first run came after keypad events. **Clean repeat, 2026-11-02:** the controller was
+power-cycled with no keypad use, and the bridge sent nothing during boot. Then `info 1` as its first frame got
+a reply in 40 ms (`ZoneInfo z1 off src=1 vol=35 ... sys=off`). So `config::kSessionStartEvent = kNone`.
+On boot the controller sends just three frames: event `D4` to `7D.00.00`, event `C5` to `7E.00.00`, and a
+SetData broadcast to `7F.00.00` (path `01.01`) containing ASCII `V2.00.00`, probably its firmware version:
+```
+RX F0 7F 00 00 00 00 7F 00 02 01 01 02 01 01 00 00 01 00 10 00 00 F1 69 00 56 32 2E 30 30 2E 30 30 00 5A 5A 5A 5A 12 F7
+```
+After the power-cycle, zone 1 came back off with source 1, volume 35. This also confirms
 M0.2: the null-modem cable works in both directions. The reply arrived 40 ms after the request and matches the
 keypad (zone 1 on, source 2, volume 70 = raw 35) and the SPEC §3.4 layout byte for byte:
 ```
