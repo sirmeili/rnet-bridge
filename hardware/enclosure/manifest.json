@@ -25,6 +25,186 @@
       }
     },
     {
+      "id": "lid-asm",
+      "name": "Lid asm",
+      "group": "lid-asm",
+      "material": "finish",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "lid_asm"
+        }
+      }
+    },
+    {
+      "id": "g-pipes",
+      "name": "G pipes",
+      "group": "lit-button-plunger-asm",
+      "material": "clear",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_pipes"
+        }
+      }
+    },
+    {
+      "id": "lit-button-plunger-asm",
+      "name": "Lit button light pipe",
+      "group": "lit-button-plunger-asm",
+      "material": "clear",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "lit_button_plunger_asm"
+        }
+      }
+    },
+    {
+      "id": "plunger-asm",
+      "name": "Plunger asm",
+      "group": "plunger-asm",
+      "material": "#6da69e",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "plunger_asm"
+        }
+      }
+    },
+    {
+      "id": "screws-right-asm",
+      "name": "Right Side Screws",
+      "group": "screws-right-asm",
+      "material": "plastic-black",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "screws_right_asm"
+        }
+      }
+    },
+    {
+      "id": "screws-left-asm",
+      "name": "Left side screws",
+      "group": "screws-left-asm",
+      "material": "plastic-black",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "screws_left_asm"
+        }
+      }
+    },
+    {
+      "id": "lit-button-led-asm",
+      "name": "Lit button led asm",
+      "group": "lit-button-led-asm",
+      "material": "plastic-black",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "lit_button_led_asm"
+        }
+      }
+    },
+    {
+      "id": "g-esp",
+      "name": "G esp",
+      "group": "g-esp",
+      "material": "pcb-green",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_esp"
+        }
+      }
+    },
+    {
+      "id": "g-espmod",
+      "name": "G espmod",
+      "group": "g-esp",
+      "material": "pcb-green",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_espmod"
+        }
+      }
+    },
+    {
+      "id": "g-rj",
+      "name": "G rj",
+      "group": "g-esp",
+      "material": "#a66d76",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_rj"
+        }
+      }
+    },
+    {
+      "id": "g-usb",
+      "name": "G usb",
+      "group": "g-esp",
+      "material": "metal",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_usb"
+        }
+      }
+    },
+    {
+      "id": "g-leds",
+      "name": "G leds",
+      "group": "g-esp",
+      "material": "led",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_leds"
+        }
+      }
+    },
+    {
+      "id": "g-mod",
+      "name": "G mod",
+      "group": "g-mod",
+      "material": "#6d8fa6",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_mod"
+        }
+      }
+    },
+    {
+      "id": "g-modhdr",
+      "name": "G modhdr",
+      "group": "g-mod",
+      "material": "#b8865b",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_modhdr"
+        }
+      }
+    },
+    {
+      "id": "g-db9",
+      "name": "G db9",
+      "group": "g-mod",
+      "material": "metal",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "g_db9"
+        }
+      }
+    },
+    {
       "id": "lid",
       "name": "Lid",
       "group": "lid",
@@ -135,138 +315,6 @@
       },
       "hidden": true,
       "omit": true
-    },
-    {
-      "id": "lid-asm",
-      "name": "Lid asm",
-      "group": "lid-asm",
-      "material": "finish",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "lid_asm"
-        }
-      }
-    },
-    {
-      "id": "g-pipes",
-      "name": "G pipes",
-      "group": "lid-asm",
-      "material": "clear",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_pipes"
-        }
-      }
-    },
-    {
-      "id": "plunger-asm",
-      "name": "Plunger asm",
-      "group": "plunger-asm",
-      "material": "#6da69e",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "plunger_asm"
-        }
-      }
-    },
-    {
-      "id": "g-esp",
-      "name": "G esp",
-      "group": "g-esp",
-      "material": "pcb-green",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_esp"
-        }
-      }
-    },
-    {
-      "id": "g-espmod",
-      "name": "G espmod",
-      "group": "g-esp",
-      "material": "pcb-green",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_espmod"
-        }
-      }
-    },
-    {
-      "id": "g-rj",
-      "name": "G rj",
-      "group": "g-esp",
-      "material": "#a66d76",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_rj"
-        }
-      }
-    },
-    {
-      "id": "g-usb",
-      "name": "G usb",
-      "group": "g-esp",
-      "material": "metal",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_usb"
-        }
-      }
-    },
-    {
-      "id": "g-leds",
-      "name": "G leds",
-      "group": "g-esp",
-      "material": "led",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_leds"
-        }
-      }
-    },
-    {
-      "id": "g-mod",
-      "name": "G mod",
-      "group": "g-mod",
-      "material": "#6d8fa6",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_mod"
-        }
-      }
-    },
-    {
-      "id": "g-modhdr",
-      "name": "G modhdr",
-      "group": "g-mod",
-      "material": "#b8865b",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_modhdr"
-        }
-      }
-    },
-    {
-      "id": "g-db9",
-      "name": "G db9",
-      "group": "g-mod",
-      "material": "metal",
-      "scad": {
-        "file": "rnet-bridge.scad",
-        "defines": {
-          "part": "g_db9"
-        }
-      }
     }
   ],
   "name": "Esp32poe rs232 inline 1",
@@ -280,70 +328,6 @@
         0
       ]
     },
-    "lid": {
-      "label": "Lid",
-      "explode": [
-        0,
-        0,
-        50.6
-      ]
-    },
-    "lid-inlay": {
-      "label": "Lid inlay",
-      "explode": [
-        0,
-        0,
-        -25.3
-      ]
-    },
-    "inlay-check": {
-      "label": "Inlay check",
-      "explode": [
-        0,
-        0,
-        75.9
-      ]
-    },
-    "fit": {
-      "label": "Fit",
-      "explode": [
-        0,
-        0,
-        177.1
-      ]
-    },
-    "test-front": {
-      "label": "Test front",
-      "explode": [
-        0,
-        0,
-        202.4
-      ]
-    },
-    "test-back": {
-      "label": "Test back",
-      "explode": [
-        0,
-        0,
-        227.7
-      ]
-    },
-    "test-lid-leds": {
-      "label": "Test lid leds",
-      "explode": [
-        0,
-        0,
-        101.2
-      ]
-    },
-    "plunger": {
-      "label": "Plunger",
-      "explode": [
-        0,
-        0,
-        25.3
-      ]
-    },
     "lid-asm": {
       "label": "Lid asm",
       "explode": [
@@ -353,8 +337,40 @@
       ],
       "inside": "ghost"
     },
+    "lit-button-plunger-asm": {
+      "label": "LIght Pipes",
+      "explode": [
+        0,
+        0,
+        110
+      ]
+    },
     "plunger-asm": {
       "label": "Plunger asm",
+      "explode": [
+        0,
+        0,
+        50
+      ]
+    },
+    "screws-left-asm": {
+      "label": "Left side screws",
+      "explode": [
+        0,
+        0,
+        50
+      ]
+    },
+    "screws-right-asm": {
+      "label": "Right side screws",
+      "explode": [
+        0,
+        0,
+        50
+      ]
+    },
+    "lit-button-led-asm": {
+      "label": "Status Button LED",
       "explode": [
         0,
         0,
