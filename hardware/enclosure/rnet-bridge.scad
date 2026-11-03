@@ -167,21 +167,29 @@ collar_d      = 4.8;    // wider than the tube bore, so the plunger can't escape
 collar_t      = 1.0;
 cap_proud     = 1.5;    // how far the plunger sticks up above the lid
 
-/* ---------------- lit button (light pipe plunger + LED) ---------------- */
-lit_button     = true;  // true = light one button; false = normal plungers
-lit_btn_index  = 1;      // 0 = reset, 1 = user (order of `buttons`)
+/* ---------------- lit button (light pipe plunger + wall-mounted LED) ---------------- */
+lit_button     = true;   // true = light the user button; false = normal plungers
+lit_btn_index  = 1;      // 1 = user button (the only one with room for a wall LED)
 lit_bore       = 4.2;    // guide bore for the 3.9 mm pipe body
-lit_tube_od    = 6.6;    // thicker tube, room for the LED window
+lit_tube_od    = 6.6;
 lit_tube_gap   = 6.0;    // tube end above the switch (taller than normal: deeper boot)
 lit_flange_d   = 5.6;    // recess for the 5.0 mm flange
 lit_flange_rec = 0.5;    // recess depth; flange is 1.3 tall, so it sits ~1.3 proud
 lit_travel     = 0.5;    // gap under the flange at rest, so a press can click
-lit_led_d      = 3.1;    // window for a 3 mm LED
-lit_led_z      = 3.0;    // window centre above the tube's bottom end
-lit_led_dir    = 180;    // window direction in degrees (0 = +X / right, 180 = toward centre)
 lit_cup_id     = 4.0;    // boot socket for the pipe end (glue it in)
 lit_collar_od  = 6.0;    // boot rim, wider than lit_bore so the pipe can't escape
 lit_floor      = 0.8;    // boot floor under the pipe end
+// Bambu Lab WS2812 RGB LED (KB003), set into the inside of the right wall
+lit_led_board    = [6.0, 6.0, 2.91];  // width, height, thickness (from Bambu's STL)
+lit_led_case_z   = 23.5;   // LED centre height above the bottom of the case
+lit_pocket_depth = 1.4;    // pocket depth into the 2 mm wall (leaves 0.6 mm)
+lit_pocket_clear = 0.2;    // extra room around the board
+lit_window_d     = 3.0;    // window in the guide tube, facing the LED
+lit_groove       = true;   // wire groove from the pocket down to the floor
+lit_groove_w     = 2.0;
+lit_groove_d     = 1.0;
+lit_groove_y     = 1.2;    // groove centre offset from the LED (lands between two vents)
+lit_led_stl      = "";     // e.g. "WS2812_RGB_LED_with_IDC0.8_4PIN-KB003.stl" to preview the real board
 // ---------------------------------------------------------------------
 
 
@@ -190,8 +198,19 @@ btn_tube_z = btn_z_sw + btn_tube_gap;     // bottom end of each guide tube
 
 lit_pipe_bottom = btn_z_sw + 1.0 + lit_floor;                     // pipe end, lid coords
 lit_pipe_len    = (lid_t - lit_flange_rec + lit_travel) - lit_pipe_bottom;
-if (lit_button)
+
+// where the LED pocket goes (case coords)
+lit_p     = [esp_x0 + buttons[lit_btn_index][0], esp_y0 + buttons[lit_btn_index][1]];
+lit_pk_w  = lit_led_board[0] + 2*lit_pocket_clear;   // pocket size along the wall (Y)
+lit_pk_h  = lit_led_board[1] + 2*lit_pocket_clear;   // pocket height (Z)
+lit_pk_y0 = lit_p[1] - lit_pk_w/2;
+lit_pk_z0 = lit_led_case_z - lit_pk_h/2;
+lit_gap   = (W - wall + lit_pocket_depth - lit_led_board[2]) - (lit_p[0] + lit_tube_od/2);
+if (lit_button) {
+    assert(lit_p[0] > W/2, "the wall LED only fits beside the user button (right wall)");
     echo(str("Lit button: cut the light pipe body to ", lit_pipe_len, " mm"));
+    echo(str("Lit button: LED board to guide tube clearance ", lit_gap, " mm"));
+}
 
 function esp(p) = [esp_x0 + p[0], esp_y0 + p[1]];
 function mod(u, v) = [mod_x0 + v, mod_y0 + u];
@@ -299,11 +318,23 @@ module base() {
         }
         // strap slots
         if (strap_slots) for (c = strap_y) strap_cut(c);
-        // vents, both long walls
-        if (side_vents) for (s = [0, 1], i = [0:vent_n - 1])
-            translate([s ? W - wall - 1 : -1, vent_y0 + i*6, floor_t + 4])
-                // cube([wall + 2, 3.5, in_h - 11]);
-                rbox_x([wall + 2, 2.2, in_h - 11], 1.1);
+        // vents, both long walls (right-wall vents beside the LED pocket stop below it)
+        if (side_vents) for (s = [0, 1], i = [0:vent_n - 1]) {
+            vy    = vent_y0 + i*6;
+            short = lit_button && s == 1 && vy + 2.2 > lit_pk_y0 - 0.5
+                                         && vy < lit_pk_y0 + lit_pk_w + 0.5;
+            vh    = short ? lit_pk_z0 - 1 - (floor_t + 4) : in_h - 11;
+            translate([s ? W - wall - 1 : -1, vy, floor_t + 4])
+                rbox_x([wall + 2, 2.2, vh], 1.1);
+        }
+        // lit button: LED pocket in the inside of the right wall, + wire groove
+        if (lit_button) {
+            translate([W - wall - 0.01, lit_pk_y0, lit_pk_z0])
+                cube([lit_pocket_depth + 0.01, lit_pk_w, lit_pk_h]);
+            if (lit_groove)
+                translate([W - wall - 0.01, lit_p[1] + lit_groove_y - lit_groove_w/2, floor_t])
+                    cube([lit_groove_d + 0.01, lit_groove_w, lit_pk_z0 - floor_t + 0.01]);
+        }
     }
 }
 
@@ -345,7 +376,8 @@ module led_label_shape(extra = 0) {
 module btn_label_shape(extra = 0) {
     for (i = [0:len(buttons) - 1]) if (btn_labels[i] != "") {
         p = esp(buttons[i]);
-        translate([p[0], p[1] + button_hole/2 + btn_label_gap, lid_t - label_depth])
+        hole_r = (lit_button && i == lit_btn_index) ? lit_flange_d/2 : button_hole/2;
+        translate([p[0], p[1] + hole_r + btn_label_gap, lid_t - label_depth])
             rotate(90)
                 linear_extrude(label_depth + extra)
                     text(btn_labels[i], size=btn_label_size,
@@ -369,6 +401,9 @@ module lid() {
                     if (light_pipes && s == 0)
                         translate([x - 1, pipe_ymin - pipe_boss_d/2 - 0.5, -skirt_d - 1])
                             cube([skirt_t + 2, pipe_ymax - pipe_ymin + pipe_boss_d + 1, skirt_d + 1]);
+                    if (lit_button && s == 1)          // room for the wall LED board
+                        translate([x - 1, lit_pk_y0 - 0.5, -skirt_d - 1])
+                            cube([skirt_t + 2, lit_pk_w + 1, skirt_d + 1]);
                 }
                 for (y = joint_y) {
                     px = s ? W - wall - fit - skirt_t - pad_t : wall + fit;
@@ -420,8 +455,8 @@ module lid() {
             if (lit) {
                 translate([p[0], p[1], lid_t - lit_flange_rec])
                     cylinder(d=lit_flange_d, h=lit_flange_rec + 1);
-                translate([p[0], p[1], tz + lit_led_z]) rotate([0, 0, lit_led_dir])
-                    rotate([0, 90, 0]) cylinder(d=lit_led_d, h=lit_tube_od/2 + 1);
+                translate([p[0], p[1], lit_led_case_z - H]) rotate([0, 90, 0])
+                    cylinder(d=lit_window_d, h=lit_tube_od/2 + 1);   // faces the right wall
             }
         }
 
@@ -498,10 +533,22 @@ module lit_boot_shape() {        // tip on the switch at z = 0
     }
 }
 
+module lit_led_preview() {       // the LED board sitting in its wall pocket
+    face = W - wall + lit_pocket_depth - lit_led_board[2];           // board face toward the tube
+    if (lit_led_stl != "")
+        translate([face + lit_led_board[2]/2, lit_p[1], lit_led_case_z])
+            rotate([0, 0, 90]) translate([-128, -128, -3]) color("dimgray") import(lit_led_stl);
+    else {
+        color([0.15, 0.15, 0.15]) translate([face, lit_p[1] - lit_led_board[0]/2, lit_led_case_z - lit_led_board[1]/2])
+            cube([lit_led_board[2], lit_led_board[0], lit_led_board[1]]);
+        color("white") translate([face - 0.01, lit_p[1] - 1, lit_led_case_z - 1]) cube([0.5, 2, 2]);
+    }
+}
+
 if      (part == "base") base();
 else if (part == "lid")  translate([0, L, lid_t]) rotate([180, 0, 0]) lid();
-else if (part == "lid_inlay") translate([0, L, lid_t]) rotate([180, 0, 0]) { lid_text_shape(0); led_label_shape(0); }
-else if (part == "inlay_check") translate([0, L, lid_t]) rotate([180, 0, 0]) { lid(); color("red") { lid_text_shape(0); led_label_shape(0); } }
+else if (part == "lid_inlay") translate([0, L, lid_t]) rotate([180, 0, 0]) { lid_text_shape(0); led_label_shape(0); btn_label_shape(0); }
+else if (part == "inlay_check") translate([0, L, lid_t]) rotate([180, 0, 0]) { lid(); color("red") { lid_text_shape(0); led_label_shape(0); btn_label_shape(0); } }
 else if (part == "fit")  { base(); ghosts(); }
 else if (part == "test_front") slice(0, 16) base();
 else if (part == "test_back")  translate([0, -(mod_y0 - 3), 0]) slice(mod_y0 - 3, L + 1) base();
@@ -529,12 +576,30 @@ else if (part == "assembly") {
             }
         } else color("orange") plunger_shape();
     }
+    if (lit_button) lit_led_preview();
 }
 // ---- pieces for the interactive viewer (assembly coordinates) ----
 if (part == "lid_asm") translate([0, 0, H]) lid();
-if (part == "plunger_asm") {
-    if (btn_guides) for (b = buttons)
-        color("orange") translate([each esp(b), pcb_top + btn_switch_h]) plunger_shape();
+    
+if (part == "plunger_asm") {if (btn_guides) for (i = [0:len(buttons) - 1])
+    translate([each esp(buttons[i]), pcb_top + btn_switch_h]) {
+        if (lit_button && i == lit_btn_index) {
+            color("orange") lit_boot_shape();
+        } else color("orange") plunger_shape();
+    }
+}
+if (part == "lit_button_plunger_asm") {
+    if (lit_button) {
+        translate([each esp(buttons[1]), pcb_top + btn_switch_h]) {
+            color("lightblue", 0.7) translate([0, 0, 1.0 + lit_floor]) {
+                cylinder(d=3.9, h=lit_pipe_len);
+                translate([0, 0, lit_pipe_len]) cylinder(d=5.0, h=1.3);
+            }
+        }
+    }
+}
+if (part == "lit_button_led_asm") {
+    if (lit_button) lit_led_preview();
 }
 if (part == "g_esp")  translate([esp_x0, esp_y0, esp_z0]) cube([esp_w, esp_l, pcb_t]);
 if (part == "g_espmod") translate([esp_x0 + 4.0, esp_y0 + esp_l - 25.5, pcb_top]) cube([18, 25.5, 3.1]);
