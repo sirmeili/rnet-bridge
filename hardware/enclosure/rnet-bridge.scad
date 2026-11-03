@@ -102,12 +102,13 @@ mod_x0  = wall + (in_w - mod_size)/2;           // case x of v = 0
 mod_y0  = esp_y0 + esp_l + mod_gap;             // case y of u = 0
 mod_z0  = floor_t + mod_standoff;               // PCB bottom
 db9_cz  = mod_z0 + db9_above_pcb;
+mod_clamp_preload = -0.2;   // extra post length for squeeze (ESP posts use 0.2)
 
 /* ---------------- lid joint ---------------- */
 skirt_d     = 4.5;
 skirt_t     = 1.5;
 pad_t       = 2.0;
-joint_y     = [18, 70, L - 12];     // front pair moved forward, clear of the light pipes
+joint_y     = [14, 70, L - 12];     // front pair moved forward, clear of the light pipes
 joint_dz    = 2.5;
 screw_pilot = 2.2;              // M2.5 self-tap (2.5 for M3)
 screw_clear = 3.2;
@@ -117,15 +118,15 @@ screw_head  = 5.8;
 light_pipes  = true;
 // LEDs, board-local [x from USB edge, y from Ethernet edge, label]
 // (positions read from the Olimex rev J drawing - check on your board)
-pipe_leds    = [[1.3, 17.0, "PWR"], [1.3, 23.5, "LNK"], [1.3, 29.0, "ACT"]];
-pipe_hole    = 3.9;             // datasheet panel hole
+pipe_leds    = [[1.3, 17.0, "PWR"], [1.3, 23.0, "LNK"], [1.3, 29.0, "ACT"]];
+pipe_hole    = 4.1;             // datasheet panel hole
 pipe_recess_d= 5.3;             // 5.0 mm flange + print clearance
 pipe_recess  = 1.3;             // flange height -> sits flush (0 = flange on top)
 pipe_body    = 20.9;            // PLP5-2-625 body length below the flange
-pipe_boss_t  = 1.5;             // extra lid thickness under each pipe
+pipe_boss_t  = 5;             // extra lid thickness under each pipe
 pipe_boss_d  = 7.5;
 led_labels   = true;            // debossed PWR / LNK / ACT next to the pipes
-label_size   = 2.4;
+label_size   = 3;
 label_depth  = 0.6;
 
 /* ---------------- strap slots ---------------- */
@@ -143,15 +144,18 @@ mount_ears = false;             // screw tabs, two per side
 ear_hole   = 4.5;
 side_vents = true;
 vent_y0    = 74;                // side vents start here (behind strap slot 1)
-vent_n     = 6;
+vent_n     = 8;
 lid_text       = "RNET Bridge";        // line 1 ("" = none)
 lid_text2      = "CAA6.6";        // line 2, optional
 lid_text_size  = 6;         // letter height, mm
-lid_text_y     = 74;        // centre of the text, mm back from the front edge
+lid_text_y     = 40;        // centre of the text, mm back from the front edge
 lid_text_depth = 0.6;       // how deep the letters are pressed in
 lid_text_font  = "Liberation Sans:style=Bold";
 
 /* ---------------- button plungers ---------------- */
+btn_labels     = ["RST", "USR"];   // same order as `buttons` ("" = no label)
+btn_label_size = 3;
+btn_label_gap  = 1.5;              // gap between the hole edge and the text
 btn_guides    = true;
 btn_switch_h  = 2.5;    // ESP PCB top to top of the button actuator   <-- measure
 btn_tube_od   = 5.4;
@@ -161,12 +165,33 @@ plunger_d     = 3.0;
 plunger_tip_d = 2.0;    // no wider than the actuator                  <-- measure
 collar_d      = 4.8;    // wider than the tube bore, so the plunger can't escape upward
 collar_t      = 1.0;
-cap_proud     = 1.0;    // how far the plunger sticks up above the lid
+cap_proud     = 1.5;    // how far the plunger sticks up above the lid
+
+/* ---------------- lit button (light pipe plunger + LED) ---------------- */
+lit_button     = true;  // true = light one button; false = normal plungers
+lit_btn_index  = 1;      // 0 = reset, 1 = user (order of `buttons`)
+lit_bore       = 4.2;    // guide bore for the 3.9 mm pipe body
+lit_tube_od    = 6.6;    // thicker tube, room for the LED window
+lit_tube_gap   = 6.0;    // tube end above the switch (taller than normal: deeper boot)
+lit_flange_d   = 5.6;    // recess for the 5.0 mm flange
+lit_flange_rec = 0.5;    // recess depth; flange is 1.3 tall, so it sits ~1.3 proud
+lit_travel     = 0.5;    // gap under the flange at rest, so a press can click
+lit_led_d      = 3.1;    // window for a 3 mm LED
+lit_led_z      = 3.0;    // window centre above the tube's bottom end
+lit_led_dir    = 180;    // window direction in degrees (0 = +X / right, 180 = toward centre)
+lit_cup_id     = 4.0;    // boot socket for the pipe end (glue it in)
+lit_collar_od  = 6.0;    // boot rim, wider than lit_bore so the pipe can't escape
+lit_floor      = 0.8;    // boot floor under the pipe end
 // ---------------------------------------------------------------------
 
 
 btn_z_sw  = pcb_top + btn_switch_h - H;   // switch top, in lid coordinates (lid underside = 0)
 btn_tube_z = btn_z_sw + btn_tube_gap;     // bottom end of each guide tube
+
+lit_pipe_bottom = btn_z_sw + 1.0 + lit_floor;                     // pipe end, lid coords
+lit_pipe_len    = (lid_t - lit_flange_rec + lit_travel) - lit_pipe_bottom;
+if (lit_button)
+    echo(str("Lit button: cut the light pipe body to ", lit_pipe_len, " mm"));
 
 function esp(p) = [esp_x0 + p[0], esp_y0 + p[1]];
 function mod(u, v) = [mod_x0 + v, mod_y0 + u];
@@ -181,8 +206,11 @@ pipe_ymax  = max([for (p = pipe_pts) p[1]]);
 pipe_bottom_z = H + lid_t - pipe_recess - pipe_body;
 
 // lid vents over the PoE supply move right to make room for pipes/labels
-lid_vent_x0 = !light_pipes ? esp_x0 + 4 : (led_labels ? 16.5 : 10.5);
-lid_vent_x1 = W - wall - 4;
+// lid_vent_x0 = !light_pipes ? esp_x0 + 4 : (led_labels ? 16.5 : 10.5);
+label_x0    = pipe_pts[0][0] + pipe_recess_d/2 + 1;   // where the labels start
+lid_vent_x0 = !light_pipes ? esp_x0 + 5
+            : (led_labels ? label_x0 + label_size * 2.4 + 3.0 : 10.5);
+lid_vent_x1 = W - wall - 5;
 
 echo(str("Case outside: ", W, " x ", L, " x ", H + lid_t, " mm"));
 if (light_pipes)
@@ -192,6 +220,13 @@ if (light_pipes)
 module rbox(s, r=corner_r) {
     hull() for (x=[r, s[0]-r], y=[r, s[1]-r])
         translate([x, y, 0]) cylinder(r=r, h=s[2]);
+}
+
+// like rbox, but rounded in the YZ plane: for slots cut through the side walls
+// s = [thickness (X), width (Y), height (Z)]
+module rbox_x(s, r) {
+    hull() for (y = [r, s[1] - r], z = [r, s[2] - r])
+        translate([0, y, z]) rotate([0, 90, 0]) cylinder(r=r, h=s[0]);
 }
 
 module d_shape(h_extrude) {
@@ -266,8 +301,9 @@ module base() {
         if (strap_slots) for (c = strap_y) strap_cut(c);
         // vents, both long walls
         if (side_vents) for (s = [0, 1], i = [0:vent_n - 1])
-            translate([s ? W - wall - 1 : -1, vent_y0 + i*8, floor_t + 4])
-                cube([wall + 2, 3.5, in_h - 11]);
+            translate([s ? W - wall - 1 : -1, vent_y0 + i*6, floor_t + 4])
+                // cube([wall + 2, 3.5, in_h - 11]);
+                rbox_x([wall + 2, 2.2, in_h - 11], 1.1);
     }
 }
 
@@ -292,17 +328,30 @@ module lid_text_shape(extra = 0) {
             linear_extrude(lid_text_depth + extra)
                 for (i = [0:len(lines) - 1])
                     translate([10, ((len(lines) - 1)/2 - i) * lid_text_size * 1.4])
-                        text(lines[i], size=lid_text_size, halign="center",
+                        text(lines[i], size=lid_text_size, halign="left",
                              valign="center", font=lid_text_font);
 }
 
 // PWR / LNK / ACT labels next to the light pipes
 module led_label_shape(extra = 0) {
     if (light_pipes && led_labels) for (i = [0:len(pipe_leds) - 1])
-        translate([pipe_pts[i][0] + pipe_recess_d/2 + 1.0, pipe_pts[i][1], lid_t - label_depth])
+        translate([pipe_pts[i][0] + pipe_recess_d/2 + 0.5, pipe_pts[i][1], lid_t - label_depth])
             linear_extrude(label_depth + extra)
                 text(pipe_leds[i][2], size=label_size, halign="left", valign="center",
                      font="Liberation Sans:style=Bold");
+}
+
+// labels behind the button holes, reading the same way as the lid text
+module btn_label_shape(extra = 0) {
+    for (i = [0:len(buttons) - 1]) if (btn_labels[i] != "") {
+        p = esp(buttons[i]);
+        translate([p[0], p[1] + button_hole/2 + btn_label_gap, lid_t - label_depth])
+            rotate(90)
+                linear_extrude(label_depth + extra)
+                    text(btn_labels[i], size=btn_label_size,
+                         halign="left", valign="center",
+                         font="Liberation Sans:style=Bold");
+    }
 }
 
 /* ===================== LID ===================== */
@@ -331,11 +380,19 @@ module lid() {
                 cylinder(d=3.6, h=post_len + preload);
             // MOD-RS232 clamp posts (press the board edges down onto its pins)
             for (c = mod_clamp_pts)
-                translate([each mod(c[0], c[1]), -(H - mod_z0 - mod_pcb_t) - preload])
-                    cylinder(d=mod_clamp_d, h=H - mod_z0 - mod_pcb_t + preload);
+                translate([each mod(c[0], c[1]), -(H - mod_z0 - mod_pcb_t) - mod_clamp_preload])
+                    cylinder(d=mod_clamp_d, h=H - mod_z0 - mod_pcb_t + mod_clamp_preload);
+
             // guide tubes for the button plungers
-            if (btn_guides) for (b = buttons) translate([each esp(b), btn_tube_z])
-                cylinder(d=btn_tube_od, h=-btn_tube_z + 0.01);
+            // if (btn_guides) for (b = buttons) translate([each esp(b), btn_tube_z])
+            //    cylinder(d=btn_tube_od, h=-btn_tube_z + 0.01);
+            if (btn_guides) for (i = [0:len(buttons) - 1]) {
+                lit = lit_button && i == lit_btn_index;
+                tz  = btn_z_sw + (lit ? lit_tube_gap : btn_tube_gap);
+                translate([each esp(buttons[i]), tz])
+                    cylinder(d = lit ? lit_tube_od : btn_tube_od, h = -tz + 0.01);
+            }
+
             // thicker lid under the light pipes (press-fit grip)
             if (light_pipes) intersection() {
                 hull() for (p = pipe_pts) translate([p[0], p[1], -pipe_boss_t])
@@ -349,9 +406,25 @@ module lid() {
             cylinder(d=pin_d + 0.6, h=2.5);
         if (button_hole > 0)
             for (b = buttons) translate([each esp(b), -3]) cylinder(d=button_hole, h=10);
+
         // bore through the guide tubes
-        if (btn_guides) for (b = buttons) translate([each esp(b), btn_tube_z - 1])
-            cylinder(d=btn_tube_id, h=-btn_tube_z + lid_t + 2);
+        //if (btn_guides) for (b = buttons) translate([each esp(b), btn_tube_z - 1])
+        //    cylinder(d=btn_tube_id, h=-btn_tube_z + lid_t + 2);
+        // bores through the guide tubes (+ flange recess and LED window if lit)
+        if (btn_guides) for (i = [0:len(buttons) - 1]) {
+            lit = lit_button && i == lit_btn_index;
+            tz  = btn_z_sw + (lit ? lit_tube_gap : btn_tube_gap);
+            p   = esp(buttons[i]);
+            translate([p[0], p[1], tz - 1])
+                cylinder(d = lit ? lit_bore : btn_tube_id, h = -tz + lid_t + 2);
+            if (lit) {
+                translate([p[0], p[1], lid_t - lit_flange_rec])
+                    cylinder(d=lit_flange_d, h=lit_flange_rec + 1);
+                translate([p[0], p[1], tz + lit_led_z]) rotate([0, 0, lit_led_dir])
+                    rotate([0, 90, 0]) cylinder(d=lit_led_d, h=lit_tube_od/2 + 1);
+            }
+        }
+
         // light pipe holes + flush recesses
         if (light_pipes) for (p = pipe_pts) translate([p[0], p[1], 0]) {
             translate([0, 0, -pipe_boss_t - 1]) cylinder(d=pipe_hole, h=pipe_boss_t + lid_t + 2);
@@ -360,12 +433,26 @@ module lid() {
         }
         // LED labels
         led_label_shape(1);
+        
+        // button labels
+         btn_label_shape(1);
+
         // vents over the PoE DC-DC area
-        for (i = [0:5]) translate([lid_vent_x0, esp_y0 + 14 + i*5, -1])
-            rbox([lid_vent_x1 - lid_vent_x0, 2.2, lid_t + 2], 1.1);
+        // for (i = [0:5]) translate([lid_vent_x0, esp_y0 + 14 + i*5, -1])
+        //     rbox([lid_vent_x1 - lid_vent_x0, 2.2, lid_t + 2], 1.1);
+        // (vents behind the light pipes and labels run full width, like the back vents)
+        for (i = [0:5]) {
+            y     = esp_y0 + 14 + i*5;
+            clear = light_pipes && y > pipe_ymax + pipe_recess_d/2 + 1;
+            x0    = clear ? wall + 5     : lid_vent_x0;
+            x1    = clear ? W - wall - 5 : lid_vent_x1;
+            translate([x0, y, -1]) rbox([x1 - x0, 2.2, lid_t + 2], 1.1);
+        }
+
         // vents over the MOD-RS232
-        for (i = [0:3]) translate([wall + 6, mod_y0 + 6 + i*5, -1])
-            rbox([in_w - 12, 2.2, lid_t + 2], 1.1);
+        for (i = [0:3]) translate([wall + 5, mod_y0 + 5 + i*5, -1])
+            rbox([in_w - 10, 2.2, lid_t + 2], 1.1);
+
         // lid text: one or two lines, centred in the clear area of the lid
         lid_text_shape(1);
     }
@@ -402,6 +489,15 @@ module plunger_shape() {        // tip at z = 0, cap at the top
     translate([0, 0, c_top - collar_t]) cylinder(d=collar_d, h=collar_t);  // collar
 }
 
+module lit_boot_shape() {        // tip on the switch at z = 0
+    c_top = lit_tube_gap - 0.5;  // rim stops 0.5 mm below the tube end
+    cylinder(d=plunger_tip_d, h=1.0);                            // tip
+    translate([0, 0, 1.0]) difference() {
+        cylinder(d=lit_collar_od, h=c_top - 1.0);                // rim / collar
+        translate([0, 0, lit_floor]) cylinder(d=lit_cup_id, h=c_top);   // pipe socket
+    }
+}
+
 if      (part == "base") base();
 else if (part == "lid")  translate([0, L, lid_t]) rotate([180, 0, 0]) lid();
 else if (part == "lid_inlay") translate([0, L, lid_t]) rotate([180, 0, 0]) { lid_text_shape(0); led_label_shape(0); }
@@ -416,11 +512,23 @@ else if (part == "test_lid_leds")      // front 50 mm of the lid, print orientat
     }
 else if (part == "plunger")        // print 2, standing on the cap end, with a brim
     translate([0, 0, lid_t + cap_proud - btn_z_sw]) mirror([0, 0, 1]) plunger_shape();
+else if (part == "lit_boot")     // print upside down: wide end on the bed
+    translate([0, 0, lit_tube_gap - 0.5]) mirror([0, 0, 1]) lit_boot_shape();
 else if (part == "assembly") {
     base(); ghosts();
     translate([0, 0, H + 20]) lid();
-    if (btn_guides) for (b = buttons)
-        color("orange") translate([each esp(b), pcb_top + btn_switch_h]) plunger_shape();
+    //if (btn_guides) for (b = buttons)
+    //    color("orange") translate([each esp(b), pcb_top + btn_switch_h]) plunger_shape();
+    if (btn_guides) for (i = [0:len(buttons) - 1])
+    translate([each esp(buttons[i]), pcb_top + btn_switch_h]) {
+        if (lit_button && i == lit_btn_index) {
+            color("orange") lit_boot_shape();
+            color("lightblue", 0.7) translate([0, 0, 1.0 + lit_floor]) {
+                cylinder(d=3.9, h=lit_pipe_len);
+                translate([0, 0, lit_pipe_len]) cylinder(d=5.0, h=1.3);
+            }
+        } else color("orange") plunger_shape();
+    }
 }
 // ---- pieces for the interactive viewer (assembly coordinates) ----
 if (part == "lid_asm") translate([0, 0, H]) lid();
@@ -446,4 +554,5 @@ if (part == "g_straps") for (c = strap_y)       // 12.7 mm Velcro, looped round 
         mirror([0, 1, 0]) difference() {     // XZ profile of a loop under the case
             translate([-6, -12]) offset(r=3) offset(delta=-3) square([W + 12, floor_t + 13.4]);
             translate([-4.8, -10.8]) offset(r=2) offset(delta=-2) square([W + 9.6, floor_t + 11]);
+
         }

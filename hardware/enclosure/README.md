@@ -30,7 +30,8 @@ openscad -D 'part="base"' -o base.stl rnet-bridge.scad
 |---|---|---|
 | `base` | yes | Flat bottom, printed as modelled. |
 | `lid` | yes | Already flipped into print orientation. |
-| `plunger` | yes, ×2 | Reset/user button plungers. Print standing on the cap end, with a brim. |
+| `plunger` | yes, ×2 (×1 with `lit_button`) | Reset/user button plungers. Print standing on the cap end, with a brim. |
+| `lit_boot` | yes, with `lit_button` | Boot for the lit button. A PLP5 light pipe, cut to the length OpenSCAD echoes, is glued into it. Print wide end down. |
 | `lid_inlay` | optional | The lid text and LED labels as separate bodies, for a second-colour inlay. |
 | `test_front`, `test_back`, `test_lid_leds` | optional | Small slices for checking the RJ45, DB9, and light-pipe fit before a full print. |
 | `assembly`, `fit`, `inlay_check` | no | Previews with stand-in boards. |
@@ -44,6 +45,9 @@ Exported STL/3MF files aren't committed. Generate them from the `.scad` file.
 - The boards need no screws. The ESP32 sits on 3 locating pins and the MOD-RS232 on 4, and posts on the
   lid clamp both boards down.
 - Optional: 3 × Bivar PLP5-2-625 light pipes over the PWR/LNK/ACT LEDs (`light_pipes`).
+- Optional: lit user button (`lit_button`). One more PLP5 light pipe acts as the button plunger, and an RGB
+  status LED shines into it through a window in the guide tube. The planned LED is a Bambu Lab WS2812 RGB LED
+  (IDC 0.8 mm 4-pin).
 - Optional: two 12.7 mm hook-and-loop straps or zip ties through the floor slots for rail mounting
   (`strap_slots`). The flat bottom also suits adhesive strips. Screw tabs are available as `mount_ears`.
 
