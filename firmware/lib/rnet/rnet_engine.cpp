@@ -48,6 +48,8 @@ bool valid_command(const Command& c, const EngineConfig& cfg) {
       return true;
     case CommandType::kRefresh:
       return c.zone == 0 || valid_zone(c.zone);
+    case CommandType::kRaw:
+      return false;  // only through submit_raw()
   }
   return false;
 }
@@ -69,6 +71,29 @@ CommandError Engine::submit(const Command& cmd) {
   queue_[(queue_head_ + queue_count_) % kQueueDepth] = cmd;
   ++queue_count_;
   return CommandError::kNone;
+}
+
+CommandError Engine::submit_raw(uint32_t id, const uint8_t* wire, size_t len) {
+  if (len == 0 || len > kMaxWireBytes) {
+    return CommandError::kInvalid;
+  }
+  if (queue_count_ == kQueueDepth) {
+    return CommandError::kBusy;
+  }
+  for (size_t i = 0; i < kRawSlots; ++i) {
+    if (!raw_[i].used) {
+      raw_[i].used = true;
+      for (size_t k = 0; k < len; ++k) {
+        raw_[i].frame.bytes[k] = wire[k];
+      }
+      raw_[i].frame.len = len;
+      queue_[(queue_head_ + queue_count_) % kQueueDepth] =
+          Command{id, CommandType::kRaw, 0, static_cast<int16_t>(i), ZoneParam::kBass};
+      ++queue_count_;
+      return CommandError::kNone;
+    }
+  }
+  return CommandError::kBusy;
 }
 
 bool Engine::next_result(CommandResult& out) {
@@ -123,6 +148,9 @@ void Engine::read_bytes(uint32_t now_ms) {
 
 void Engine::on_frame(uint32_t now_ms) {
   ++stats_.rx;
+  if (tap_ != nullptr) {
+    tap_(tap_ctx_, false, parser_.last_wire(), parser_.last_wire_len());
+  }
   const Frame& f = parser_.frame();
   // The port also repeats keypad bus traffic (SPEC §3.8). Only frames addressed to us matter.
   if (f.target.keypad != kBridgeKeypadId || f.target.zone >= kNumZones) {
@@ -160,6 +188,9 @@ void Engine::on_frame(uint32_t now_ms) {
       io_.write(ack.bytes, ack.len);
       ++stats_.tx;
       ++stats_.acks_tx;
+      if (tap_ != nullptr) {
+        tap_(tap_ctx_, true, ack.bytes, ack.len);
+      }
     }
   }
 }
@@ -279,6 +310,17 @@ bool Engine::send_next(uint32_t now_ms) {
 }
 
 bool Engine::send_command(const Command& c, uint32_t now_ms) {
+  if (c.type == CommandType::kRaw) {
+    RawSlot& slot = raw_[static_cast<size_t>(c.value)];
+    slot.used = false;
+    if (!link_up_) {
+      finish(c.id, CommandError::kLinkDown);
+      return false;
+    }
+    transmit(slot.frame, now_ms);
+    finish(c.id, CommandError::kNone);
+    return true;
+  }
   if (!link_up_) {
     finish(c.id, CommandError::kLinkDown);
     return false;
@@ -332,6 +374,8 @@ bool Engine::send_command(const Command& c, uint32_t now_ms) {
       schedule_turn_on_volume(c.zone, now_ms);
       finish(c.id, CommandError::kNone);
       return false;
+    case CommandType::kRaw:
+      break;  // handled above
   }
   if (!built) {
     finish(c.id, CommandError::kInvalid);
@@ -366,6 +410,9 @@ void Engine::transmit(const WireFrame& frame, uint32_t now_ms) {
   ++stats_.tx;
   last_tx_ms_ = now_ms;
   sent_any_ = true;
+  if (tap_ != nullptr) {
+    tap_(tap_ctx_, true, frame.bytes, frame.len);
+  }
 }
 
 void Engine::finish(uint32_t id, CommandError error) {
