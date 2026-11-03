@@ -606,6 +606,97 @@ void test_partial_frame_dropped_after_inter_byte_timeout() {
   TEST_ASSERT_TRUE(r.engine.link_up());
 }
 
+// --- Raw frames and frame tracing ---
+
+void test_raw_frame_is_sent_as_is() {
+  Rig r;
+  r.bring_up();
+  TEST_ASSERT_EQUAL(CommandError::kNone, r.engine.submit_raw(42, kZone1Menu, sizeof(kZone1Menu)));
+  r.run_for(60);
+  const CommandResult res = r.result();
+  TEST_ASSERT_EQUAL_UINT32(42, res.id);
+  TEST_ASSERT_EQUAL(CommandError::kNone, res.error);
+  bool sent = false;
+  for (size_t i = 0; i < r.io.count(); ++i) {
+    const SentFrame& s = r.io.sent(i);
+    sent = sent || (s.wire.len == sizeof(kZone1Menu) &&
+                    std::memcmp(s.wire.bytes, kZone1Menu, sizeof(kZone1Menu)) == 0);
+  }
+  TEST_ASSERT_TRUE(sent);
+}
+
+void test_raw_frame_limits() {
+  Rig r;
+  TEST_ASSERT_EQUAL(CommandError::kInvalid, r.engine.submit_raw(1, kZone1Menu, 0));
+  uint8_t big[rnet::kMaxWireBytes + 1] = {};
+  TEST_ASSERT_EQUAL(CommandError::kInvalid, r.engine.submit_raw(1, big, sizeof(big)));
+  for (size_t i = 0; i < Engine::kRawSlots; ++i) {
+    TEST_ASSERT_EQUAL(CommandError::kNone, r.engine.submit_raw(1, kZone1Menu, sizeof(kZone1Menu)));
+  }
+  TEST_ASSERT_EQUAL(CommandError::kBusy, r.engine.submit_raw(1, kZone1Menu, sizeof(kZone1Menu)));
+  // Commands still fit: the raw slots are separate from the queue depth.
+  TEST_ASSERT_EQUAL(CommandError::kNone, r.submit(CommandType::kSetPower, 1, 1));
+}
+
+void test_raw_frame_with_link_down_fails() {
+  Rig r;
+  r.io.responsive = false;
+  r.engine.submit_raw(5, kZone1Menu, sizeof(kZone1Menu));
+  r.run_for(5);
+  TEST_ASSERT_EQUAL(CommandError::kLinkDown, r.result().error);
+  // The slot is free again.
+  for (size_t i = 0; i < Engine::kRawSlots; ++i) {
+    TEST_ASSERT_EQUAL(CommandError::kNone, r.engine.submit_raw(1, kZone1Menu, sizeof(kZone1Menu)));
+  }
+}
+
+void test_reply_to_a_raw_request_is_not_a_duplicate() {
+  Rig r;
+  r.bring_up();
+  // A raw Get All Zone Info for zone 1, as `raw_send` would send it: the fake answers it.
+  WireFrame req{};
+  TEST_ASSERT_TRUE(rnet::build_get_all_zone_info(1, req));
+  r.engine.submit_raw(1, req.bytes, req.len);
+  r.run_for(100);
+  TEST_ASSERT_EQUAL_UINT32(0, r.engine.stats().duplicate_replies);
+  // A repeat long after the raw send still counts.
+  r.run_for(1000);
+  r.io.inject(zone_info_reply(2, true, 2, 23));
+  r.run_for(5);
+  TEST_ASSERT_EQUAL_UINT32(1, r.engine.stats().duplicate_replies);
+}
+
+struct TapLog {
+  size_t tx = 0;
+  size_t rx = 0;
+  bool first_tx_is_poll = false;
+};
+
+void tap_cb(void* ctx, bool tx, const uint8_t* wire, size_t len) {
+  auto* log = static_cast<TapLog*>(ctx);
+  if (tx) {
+    if (log->tx == 0) {
+      WireFrame poll{};
+      rnet::build_get_all_zone_info(1, poll);
+      log->first_tx_is_poll = len == poll.len && std::memcmp(wire, poll.bytes, len) == 0;
+    }
+    ++log->tx;
+  } else {
+    ++log->rx;
+  }
+}
+
+void test_frame_tap_sees_both_directions() {
+  Rig r;
+  TapLog log;
+  r.engine.set_frame_tap(tap_cb, &log);
+  r.run_for(1000);
+  TEST_ASSERT_TRUE(log.first_tx_is_poll);
+  TEST_ASSERT_EQUAL_size_t(r.engine.stats().tx, log.tx);
+  TEST_ASSERT_EQUAL_size_t(r.engine.stats().rx, log.rx);
+  TEST_ASSERT_TRUE(log.rx > 0);
+}
+
 }  // namespace
 
 int main() {
@@ -638,5 +729,10 @@ int main() {
   RUN_TEST(test_retransmitted_reply_counts_as_duplicate);
   RUN_TEST(test_regular_polls_are_not_duplicates);
   RUN_TEST(test_partial_frame_dropped_after_inter_byte_timeout);
+  RUN_TEST(test_raw_frame_is_sent_as_is);
+  RUN_TEST(test_raw_frame_limits);
+  RUN_TEST(test_raw_frame_with_link_down_fails);
+  RUN_TEST(test_reply_to_a_raw_request_is_not_a_duplicate);
+  RUN_TEST(test_frame_tap_sees_both_directions);
   return UNITY_END();
 }

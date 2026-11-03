@@ -12,6 +12,7 @@ milestone, and do not jump ahead to later milestones unless asked.
 ## Layout
 - `firmware/` — PlatformIO, Arduino framework, board `esp32-poe-iso`
   - `lib/rnet/` — pure C++ protocol code (codec, messages, engine, zone model). **No Arduino headers here.**
+  - `lib/bridge/` — pure C++ network-side logic (API JSON, network fallback policy). Also no Arduino headers.
 - `custom_components/rnet_bridge/` — HA integration (Python, asyncio)
 - `hardware/enclosure/` — 3D-printable case (OpenSCAD) and viewer `manifest.json`; see its README
 - `tools/` — `fake_bridge.py` (simulated bridge), `rnet_decode.py`, `rnet_cli.py`

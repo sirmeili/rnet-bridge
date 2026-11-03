@@ -10,12 +10,21 @@
 
 class UsbCli {
  public:
-  // Takes the model's change flags (ZoneModel::take_changed), so nothing else may consume them.
-  UsbCli(Print& out, Stream& in, rnet::Engine& engine, rnet::ZoneModel& model);
+  // Command ids carry `id_bit`, so main can route engine results back here (on_result).
+  UsbCli(Print& out, Stream& in, rnet::Engine& engine, const rnet::ZoneModel& model,
+         uint32_t id_bit);
 
   void begin();
-  // Call every loop(), after Engine::tick(). Never blocks.
-  void poll(uint32_t now_ms);
+  // Prints extra status lines for the `net` command (the network lives outside the CLI).
+  void set_status_hook(void (*hook)(Print& out)) { status_hook_ = hook; }
+  // Starts a debug Wi-Fi scan for the `wifiscan` command.
+  void set_scan_hook(void (*hook)(Print& out)) { scan_hook_ = hook; }
+  // Starts a debug test AP for the `aptest <channel>` command.
+  void set_aptest_hook(void (*hook)(Print& out, int channel)) { aptest_hook_ = hook; }
+  // Call every loop(), after Engine::tick(), with the zones and link change taken from the model
+  // and engine this tick. Never blocks.
+  void poll(uint32_t now_ms, uint8_t changed_zones, bool link_changed);
+  void on_result(const rnet::CommandResult& r);
 
  private:
   static constexpr size_t kLineMax = 80;
@@ -25,7 +34,6 @@ class UsbCli {
   void execute(char* line);
   void submit(rnet::CommandType type, uint8_t zone, int16_t value,
               rnet::ZoneParam param = rnet::ZoneParam::kBass);
-  void print_results();
   void print_zone(uint8_t zone);
   void print_link();
   void print_stats();
@@ -34,7 +42,11 @@ class UsbCli {
   Print& out_;
   Stream& in_;
   rnet::Engine& engine_;
-  rnet::ZoneModel& model_;
+  const rnet::ZoneModel& model_;
+  uint32_t id_bit_;
+  void (*status_hook_)(Print& out) = nullptr;
+  void (*scan_hook_)(Print& out) = nullptr;
+  void (*aptest_hook_)(Print& out, int channel) = nullptr;
 
   char line_[kLineMax];
   size_t line_len_ = 0;

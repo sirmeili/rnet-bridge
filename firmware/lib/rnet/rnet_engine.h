@@ -51,6 +51,7 @@ enum class CommandType : uint8_t {
   kAllOn,        // zone ignored
   kAllOff,       // zone ignored
   kRefresh,      // zone 1..6, or 0 = all zones
+  kRaw,          // debug: queued with submit_raw(), not submit()
 };
 
 struct Command {
@@ -85,15 +86,26 @@ struct EngineStats {
   uint32_t acks_tx;
 };
 
+// Called for every frame sent (`tx` true) or received with a valid checksum, for frame tracing.
+using FrameTap = void (*)(void* ctx, bool tx, const uint8_t* wire, size_t len);
+
 class Engine {
  public:
   static constexpr size_t kQueueDepth = 32;
+  static constexpr size_t kRawSlots = 4;  // raw frames waiting in the queue at once
 
   Engine(ByteIo& io, ZoneModel& model, const EngineConfig& config = EngineConfig{});
 
   // Queues a command. Returns kNone if accepted (its result follows from next_result()), or kBusy /
   // kInvalid immediately, in which case no result follows.
   CommandError submit(const Command& cmd);
+  // Queues complete wire bytes (F0 through F7) to send as-is, in order with other commands.
+  // kInvalid if `len` is 0 or over kMaxWireBytes; kBusy if the queue or the raw slots are full.
+  CommandError submit_raw(uint32_t id, const uint8_t* wire, size_t len);
+  void set_frame_tap(FrameTap tap, void* ctx) {
+    tap_ = tap;
+    tap_ctx_ = ctx;
+  }
   // Pops the next completed command result. A command counts as done (kNone) once its frame is
   // sent: the controller doesn't acknowledge events, so the follow-up poll is the confirmation.
   bool next_result(CommandResult& out);
@@ -170,6 +182,16 @@ class Engine {
 
   LastReply last_zone_info_[kNumZones] = {};
   LastReply last_tov_[kNumZones] = {};
+
+  struct RawSlot {
+    bool used;
+    WireFrame frame;
+  };
+  RawSlot raw_[kRawSlots] = {};
+  bool raw_sent_ = false;
+  uint32_t raw_sent_ms_ = 0;
+  FrameTap tap_ = nullptr;
+  void* tap_ctx_ = nullptr;
 
   EngineStats stats_{};
 };
