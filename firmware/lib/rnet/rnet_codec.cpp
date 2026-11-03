@@ -79,9 +79,11 @@ bool encode(const Frame& frame, WireFrame& out) {
 void FrameParser::reset() {
   state_ = State::kIdle;
   raw_len_ = 0;
+  last_wire_len_ = 0;
 }
 
 ParseResult FrameParser::feed(uint8_t b) {
+  last_wire_len_ = 0;
   if (b == kStartOfMessage) {
     const bool was_partial = state_ == State::kInFrame;
     state_ = State::kInFrame;
@@ -98,6 +100,8 @@ ParseResult FrameParser::feed(uint8_t b) {
   }
   if (b == kEndOfMessage) {
     state_ = State::kIdle;
+    raw_[raw_len_] = kEndOfMessage;  // always fits: raw_len_ <= kMaxWireBytes - 1
+    last_wire_len_ = raw_len_ + 1;
     return complete();
   }
   if (raw_len_ >= kMaxWireBytes - 1) {  // keep room so F0..cs always fits

@@ -50,8 +50,16 @@ enum class SessionStartEvent : uint8_t {
 
 // --- Builders. All return false (and out.len == 0) on invalid arguments. ---
 
-// Zone power. Sent with source zone 00 for every zone, matching the PDF hex table (SPEC §3.3 note).
-bool build_zone_power(uint8_t zone, bool on, WireFrame& out);
+// Source Zone ID (byte 6) used for Zone On/Off. SPEC §3.3 uses kZero (the PDF hex table form);
+// kZone is the PDF §8.1.1 template form, kept so M2 can test both (SPEC §11 item 8).
+enum class PowerSourceZone : uint8_t {
+  kZero,
+  kZone,
+};
+
+// Zone power.
+bool build_zone_power(uint8_t zone, bool on, WireFrame& out,
+                      PowerSourceZone source_zone = PowerSourceZone::kZero);
 bool build_all_zones_power(bool on, WireFrame& out);
 bool build_select_source(uint8_t zone, uint8_t source, WireFrame& out);
 bool build_set_volume(uint8_t zone, uint8_t volume, WireFrame& out);
@@ -98,6 +106,20 @@ struct ZoneParamValue {
   ZoneParam param;
   int8_t value;  // API units, as for build_set_zone_param
 };
+
+// View of a Set Data body: target path, source path, packet number/count, data length, data.
+// Pointers refer into the Frame passed to split_set_data().
+struct SetDataView {
+  const uint8_t* target_path;
+  size_t target_path_len;
+  const uint8_t* source_path;
+  size_t source_path_len;
+  const uint8_t* data;
+  size_t data_len;
+};
+
+// False if `frame` is not Set Data or its body is truncated.
+bool split_set_data(const Frame& frame, SetDataView& out);
 
 enum class ReplyResult : uint8_t {
   kOk,
