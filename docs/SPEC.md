@@ -354,6 +354,9 @@ host with a scripted fake controller.
 - **While the portal is open, the API server is paused** (implementation note, 2026-11-03). WiFiManager's portal
   runs its own web server on port 80, the same port as the API. This only happens with no network at all, or for
   up to 5 minutes after a double reset. Saving the portal form restarts the bridge.
+- **The portal AP uses channel 6** (2026-11-03). On this board an AP on WiFiManager's default channel 1 was
+  invisible, and Ethernet dropped several times while the AP ran alongside it. Both are recorded in
+  `docs/rnet-notes.md` (M4 network check). Only the forced portal runs both radios at once.
 - The rules live in `lib/bridge/network_policy` (pure C++, native-tested). Saved Wi-Fi credentials are read once
   at boot, because the Wi-Fi driver is off while on Ethernet.
 - Settings are stored in NVS (`Preferences`).

@@ -15,6 +15,10 @@ class Network {
  public:
   explicit Network(Settings& settings) : settings_(settings) {}
 
+  // Called with true just before the portal starts and false just after it stops. The portal's web
+  // server can only bind port 80 once the API server has let go of it.
+  void set_portal_hook(void (*hook)(bool opening)) { portal_hook_ = hook; }
+
   // Starts Ethernet. `force_portal` after a double reset. Blocks briefly (PHY power-up).
   void begin(bool force_portal);
   void loop(uint32_t now_ms);
@@ -26,8 +30,12 @@ class Network {
   bool take_restart_requested();
   int wifi_rssi() const;
   String local_ip() const;
-  // One diagnostic line for the USB `net` command.
+  // Diagnostic lines for the USB `net` command.
   void print_status(Print& out) const;
+  // Debug (USB `wifiscan`): scan for Wi-Fi networks; results print to `out` when done.
+  void start_scan(Print& out);
+  // Debug (USB `aptest <channel>`): a plain open AP "RNET-TEST-AP", bypassing WiFiManager.
+  void start_test_ap(Print& out, int channel);
 
   // Lowercase hex Ethernet MAC (stable bridge id, docs/protocol.md) and the last 4 hex digits.
   // Available before begin().
@@ -36,6 +44,7 @@ class Network {
 
  private:
   void apply(const bridge::NetPlan& plan);
+  void poll_scan();
   void start_portal();
   void stop_portal();
 
@@ -46,4 +55,6 @@ class Network {
   bool portal_running_ = false;
   bool has_credentials_ = false;
   uint32_t eth_events_seen_ = 0;
+  Print* scan_out_ = nullptr;
+  void (*portal_hook_)(bool opening) = nullptr;
 };

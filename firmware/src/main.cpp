@@ -71,10 +71,13 @@ void setup() {
   char default_hostname[24];
   std::snprintf(default_hostname, sizeof(default_hostname), "rnet-bridge-%s", Network::id_suffix());
   g_settings.load(default_hostname);  // before the network: it sets the hostname
+  g_api = new ApiServer(g_engine, g_model, g_network, g_settings, g_lock);  // once, at boot
+  g_network.set_portal_hook([](bool opening) { g_api->set_paused(opening); });
   g_network.begin(double_reset);
   g_cli.set_status_hook([](Print& out) { g_network.print_status(out); });
+  g_cli.set_scan_hook([](Print& out) { g_network.start_scan(out); });
+  g_cli.set_aptest_hook([](Print& out, int channel) { g_network.start_test_ap(out, channel); });
 
-  g_api = new ApiServer(g_engine, g_model, g_network, g_settings, g_lock);  // once, at boot
   g_engine.set_frame_tap(&ApiServer::frame_tap, g_api);
   g_api->begin();
   LOG_INFO("RNET Bridge %s, proto %d, RNET on UART1 RX=GPIO%d TX=GPIO%d", config::kFirmwareVersion,
@@ -88,8 +91,7 @@ void loop() {
     Settings::set_double_reset_flag(false);
   }
 
-  g_network.loop(now);
-  g_api->set_paused(g_network.portal_active());
+  g_network.loop(now);  // pauses/resumes the API around the portal (set_portal_hook)
   if (g_network.take_serving_changed() && g_network.serving() != bridge::Iface::kNone) {
     mdns::announce(g_settings.hostname, Network::id(), config::kFirmwareVersion);
     ota::begin(g_settings.hostname, g_settings.ota_password);

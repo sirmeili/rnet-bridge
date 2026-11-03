@@ -33,7 +33,8 @@ class ApiServer {
   static bool owns_result(uint32_t id) { return (id & kCliIdBit) == 0; }
   // The portal needs port 80: stop serving while it is open.
   void set_paused(bool paused);
-  // True once after OTA succeeded or a factory reset was requested: the caller restarts.
+  // True once after OTA succeeded or a factory reset was requested: the caller restarts. A factory
+  // reset's erase runs here, in the main loop. Call from the main loop only.
   bool take_restart_requested();
   // Engine frame tap (Engine::set_frame_tap) for trace_frames.
   static void frame_tap(void* ctx, bool tx, const uint8_t* wire, size_t len);
@@ -101,6 +102,7 @@ class ApiServer {
   uint32_t last_link_ms_ = 0;
   uint32_t last_cleanup_ms_ = 0;
   volatile bool restart_requested_ = false;
+  volatile bool factory_reset_requested_ = false;
   volatile bool ota_authorized_ = false;
   volatile bool ota_ok_ = false;
 

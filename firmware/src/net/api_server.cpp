@@ -46,9 +46,7 @@ void ApiServer::begin() {
       return;
     }
     request->send(200, "application/json", "{\"ok\":true}");
-    LOG_WARN("api: factory reset requested");
-    Settings::factory_reset();
-    restart_requested_ = true;
+    factory_reset_requested_ = true;  // done in the main loop, not on the async_tcp task
   });
 
   server_.on(
@@ -88,6 +86,12 @@ void ApiServer::set_paused(bool paused) {
 }
 
 bool ApiServer::take_restart_requested() {
+  if (factory_reset_requested_) {
+    factory_reset_requested_ = false;
+    LOG_WARN("api: factory reset: erasing settings and Wi-Fi credentials");
+    Settings::factory_reset();
+    return true;
+  }
   const bool r = restart_requested_;
   restart_requested_ = false;
   return r;

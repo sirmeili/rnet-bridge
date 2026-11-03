@@ -273,3 +273,52 @@ all-zone-info volume to 20; `set 2 tov 23` restored both.
 
 Counters over about 3 minutes: 392 tx, 427 rx, 0 checksum errors, 0 timeouts, 0 retries, 0 duplicate replies. One
 partial frame was dropped, during the board reset at the start.
+
+## M4 network check (2026-11-03)
+Firmware 0.0.3 (`esp32` env), board on a PoE switch port plus USB, CAA6.6 connected. Driven from a Windows PC with
+`tools/rnet_cli.py` and `curl`, while a USB recorder captured the console.
+
+| Step | Result |
+|---|---|
+| Boot on Ethernet | Link up 1.7 s after boot, IP at about 4.6 s (DHCP), RNET link up at 2 s |
+| mDNS | `_rnetbridge._tcp` found with TXT `id`, `fw`, `proto`. See the discovery note below |
+| `/api/info`, status page, 404 | Correct; `network:"ethernet"`, `wifi_rssi:null` |
+| WebSocket commands | All `cmd`s confirmed by `zone_state`; `invalid` for volume 51, zone 9 and unknown `cmd`; `raw_send` with `fix_checksum` ok |
+| Keypad → WebSocket | Volume and source changes pushed within one poll cycle |
+| `trace_frames`, `subscribe_logs` | Frames both directions; log lines delivered live |
+| OTA `POST /api/ota` | 1.05 MB in 3 s, `{"ok":true}`, rebooted into the new image |
+| Ethernet unplugged, no Wi-Fi saved | Portal opened immediately; phone joined; settings saved; restarted |
+| Saved Wi-Fi, no Ethernet | Waited the 10 s boot window, joined Wi-Fi in 2 s, `network:"wifi"`, `wifi_rssi` about -41 |
+| Ethernet plugged back in | Switched to Ethernet 3 s after link up, Wi-Fi stopped, mDNS re-announced |
+| Double reset (two USB resets within 3 s) | Portal forced alongside Ethernet; closed after 5 min; API resumed |
+| `POST /api/factory_reset` | Settings and Wi-Fi credentials erased; came back on Ethernet with no portal |
+
+**Bugs found and fixed during the test:**
+- **Portal invisible on channel 1.** WiFiManager's default AP channel is 1. A phone and the PC (fresh WinRT scan)
+  never saw it, while a plain `softAP` on channel 6 showed at -17 dBm and the board's own scan saw nearby networks at
+  -38 dBm. The portal is now pinned to channel 6. The cause is unconfirmed; RF interference from the 50 MHz RMII clock
+  on GPIO17 is a guess.
+- **Portal page refused.** The API server still held port 80 when WiFiManager's server started. The API now pauses
+  before the portal starts.
+- **Saved Wi-Fi not detected at boot.** `WiFi.SSID()` reports the connected network, not the stored one. It now
+  reads the station config with `esp_wifi_get_config`.
+- **Factory reset left the Wi-Fi credentials.** Erasing needs the Wi-Fi driver started. The reset now runs in the
+  main loop and calls `esp_wifi_restore()`.
+- Hostname set before the network starts; NVS reads quiet on a fresh board; the log is lock-protected (the OTA
+  handler logs from the async_tcp task); a reply soon after a raw send isn't counted as a duplicate; Wi-Fi modem
+  sleep off (one `/api/info` call over Wi-Fi had stalled).
+
+**Known issues (not fixed):**
+- **Ethernet drops while the Wi-Fi AP runs.** During the 5-minute forced portal, Ethernet went down 3 times and
+  recovered each time within about 5 s. There were no drops before the portal or after it closed. Only the forced
+  portal runs both radios at once; normal operation uses one interface at a time.
+- **WiFiManager blocks about 0.5 s when it starts the AP** (`delay(500)` in `startAP`). That cost one RNET request
+  timeout plus a retry, and the late reply was counted in `duplicate_replies`. It happens once per portal start.
+- **A VLAN change on the switch port doesn't renew the address.** The link stays up, so the bridge keeps its old
+  DHCP address until the lease expires or it reboots. This is ordinary DHCP behaviour. It was seen when the port
+  moved from 10.1.0.x to 10.0.0.x.
+- **mDNS browsing from a PC with extra adapters** (e.g. WSL's vEthernet) can miss the service; use
+  `rnet_cli.py discover --interface <local IP>`. Across subnets it needs an mDNS reflector.
+
+**Not tested on hardware:** API token auth (WebSocket `auth`, `Bearer` on factory reset) and an OTA password. Both are
+set through the portal, and none was set. The JSON side is native-tested.

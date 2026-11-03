@@ -2,6 +2,7 @@
 
 #include <Preferences.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 
 #include <cstring>
 
@@ -47,7 +48,9 @@ void Settings::factory_reset() {
   p.begin(kNamespace, false);
   p.clear();
   p.end();
-  WiFi.disconnect(true, true);  // also erases the stored Wi-Fi credentials
+  // The Wi-Fi driver is off while on Ethernet, and erasing needs it started.
+  WiFi.mode(WIFI_STA);
+  esp_wifi_restore();  // erases the stored Wi-Fi configuration
 }
 
 bool Settings::double_reset_flag() {

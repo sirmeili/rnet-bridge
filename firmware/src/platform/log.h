@@ -1,9 +1,10 @@
 // Log ring buffer with level filtering (SPEC §4.2). Every line goes to USB serial; the API server
-// reads new lines from the ring and forwards them to subscribed WebSocket clients. Call from the
-// main loop task only.
+// reads new lines from the ring and forwards them to subscribed WebSocket clients. printf() is safe
+// from any task (the async_tcp task logs OTA progress); line() is for the main loop.
 #pragma once
 
 #include <Arduino.h>
+#include <freertos/semphr.h>
 
 #include "api_protocol.h"
 
@@ -30,7 +31,8 @@ class Log {
  private:
   Print& usb_;
   Line lines_[kLines] = {};
-  uint32_t next_seq_ = 0;
+  volatile uint32_t next_seq_ = 0;
+  SemaphoreHandle_t lock_ = nullptr;
 };
 
 extern Log g_log;

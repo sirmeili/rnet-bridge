@@ -142,6 +142,14 @@ void UsbCli::execute(char* line) {
     if (status_hook_ != nullptr) {
       status_hook_(out_);
     }
+  } else if (is("wifiscan")) {
+    if (scan_hook_ != nullptr) {
+      scan_hook_(out_);
+    }
+  } else if (is("aptest") && parse_int(argv[1], 1, 13, value)) {
+    if (aptest_hook_ != nullptr) {
+      aptest_hook_(out_, static_cast<int>(value));
+    }
   } else if ((is("on") || is("off")) && has_zone) {
     submit(rnet::CommandType::kSetPower, z, is("on") ? 1 : 0);
   } else if (is("src") && has_zone && parse_int(argv[2], -999, 999, value)) {
@@ -226,6 +234,7 @@ void UsbCli::print_help() {
       "Zones and sources are 1-based. Zone changes print automatically.\r\n"
       "  state | stats            all zones and link | counters\r\n"
       "  net                      network status (interface, IP, Ethernet link, portal, heap)\r\n"
+      "  wifiscan                 debug: list the Wi-Fi networks the board can see\r\n"
       "  on <z> | off <z>         zone power\r\n"
       "  src <z> <1-6>            select source\r\n"
       "  vol <z> <0-50>           set volume (raw; keypad shows x2)\r\n"

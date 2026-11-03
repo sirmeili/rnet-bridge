@@ -14,8 +14,14 @@
     `tools/rnet_cli.py`. Firmware 0.0.3 on min_spiffs partitions.
   - Checks so far: `pio test -e native` 133/133; `pio run -e esp32` (53% flash, 17% RAM) and `-e esp32-console`
     succeed with no warnings; `rnet_cli.py` passes ruff and `mypy --strict`.
-  - Next: hardware tests with the human (Ethernet/PoE, mDNS, API, keypad push, Wi-Fi fallback, portal, OTA,
-    factory reset), then the PR.
+  - **Hardware tests passed (2026-11-03)**, recorded in `docs/rnet-notes.md` ("M4 network check"): Ethernet/PoE,
+    mDNS, HTTP, WebSocket commands, keypad push, tracing and logs, OTA, portal → Wi-Fi, Ethernet return, double
+    reset, factory reset. Fixes made along the way: portal on channel 6, API paused before the portal, saved-Wi-Fi
+    detection, factory reset erasing Wi-Fi, a thread-safe log, and Wi-Fi modem sleep off.
+  - Known issues: Ethernet drops while the forced portal's AP runs; WiFiManager blocks about 0.5 s at portal start.
+  - Not hardware-tested: API token and OTA password (none were set).
+  - Board state: factory reset (no Wi-Fi saved, default settings), on Ethernet at 10.0.0.165.
+  - Next: PR review and merge by the human.
 
 ## Next
 - M5 integration skeleton. It can proceed without hardware using `fake_bridge.py`.
