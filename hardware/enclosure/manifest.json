@@ -73,6 +73,30 @@
       }
     },
     {
+      "id": "screws-right-asm",
+      "name": "Right Side Screws",
+      "group": "screws-right-asm",
+      "material": "plastic-black",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "screws_right_asm"
+        }
+      }
+    },
+    {
+      "id": "screws-left-asm",
+      "name": "Left side screws",
+      "group": "screws-left-asm",
+      "material": "plastic-black",
+      "scad": {
+        "file": "rnet-bridge.scad",
+        "defines": {
+          "part": "screws_left_asm"
+        }
+      }
+    },
+    {
       "id": "lit-button-led-asm",
       "name": "Lit button led asm",
       "group": "lit-button-led-asm",
@@ -323,6 +347,22 @@
     },
     "plunger-asm": {
       "label": "Plunger asm",
+      "explode": [
+        0,
+        0,
+        50
+      ]
+    },
+    "screws-left-asm": {
+      "label": "Left side screws",
+      "explode": [
+        0,
+        0,
+        50
+      ]
+    },
+    "screws-right-asm": {
+      "label": "Right side screws",
       "explode": [
         0,
         0,
