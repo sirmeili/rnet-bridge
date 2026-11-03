@@ -26,8 +26,9 @@ milestone, and do not jump ahead to later milestones unless asked.
 ```bash
 # Firmware
 cd firmware
-pio run -e esp32                     # build
+pio run -e esp32                     # build (engine firmware)
 pio run -e esp32 -t upload           # flash over USB
+pio run -e esp32-console -t upload   # flash the M2 bring-up console instead (src/console/)
 pio device monitor -b 115200         # USB serial console
 pio test -e native                   # host unit tests (codec/engine)
 

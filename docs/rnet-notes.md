@@ -12,15 +12,17 @@ answered here, and the matching constants in `firmware/include/config.h` are upd
 | Bridge board | Olimex ESP32-POE-ISO (WROOM) | 2026-11-02 `esptool flash_id`: ESP32-D0WD-V3 (rev v3.1), 40 MHz crystal, 4 MB flash, USB-serial CH340 (VID:PID 1A86:7523). _Board revision printed on the PCB: fill in_ |
 | RS-232 module | Olimex MOD-RS232 Rev A on UEXT | Schematic: T1OUT → DB9 pin 2, R1IN ← DB9 pin 3 |
 | UART pins | GPIO4 TX, GPIO36 RX (UART1) | ESP32-POE-ISO Rev O schematic, UEXT pins 3/4 |
-| Cable | DB9 male-to-male null-modem | _fill in: loopback/first contact result_ |
+| Cable | DB9 male-to-male null-modem | 2026-11-02: loopback PASS through the cable (M0.1), and replies received in both directions (M2.2) |
 
 ## Flashing and the console
 
-From the `firmware/` directory (`pio` is not on PATH on the dev PC, so use `python -m platformio`):
+The bring-up console used for this checklist is the `esp32-console` build env (`src/console/`). The
+default `esp32` env is the engine firmware (M3 onward). From the `firmware/` directory (use
+`python -m platformio` where `pio` isn't on PATH):
 
 ```powershell
-python -m platformio run -e esp32 -t upload          # add --upload-port COMx if several ports exist
-python -m platformio device monitor -b 115200        # Ctrl+C to exit
+pio run -e esp32-console -t upload          # add --upload-port COMx if several ports exist
+pio device monitor -b 115200                # Ctrl+C to exit
 ```
 
 Power the board from USB only during bring-up. Ethernet/PoE isn't needed yet; the ISO board is safe
@@ -242,3 +244,32 @@ RX F0 00 00 70 00 00 7F 00 00 04 02 00 00 01 00 00 01 00 01 00 23 20 F7
 
 Applied 2026-11-02 with the human's OK: `config::kSessionStartEvent = kNone`, `config::kSendDataAck = false`, the
 All Zones On entity disabled by default, and SPEC §3.3–§3.9 and §11 updated to match.
+
+## M3 engine check (2026-11-02)
+Firmware 0.0.2, `esp32` env (engine + USB state dump), on the same controller.
+
+**Boot:** link up 56 ms after reset. All six zones polled and turn-on volumes read within 2.6 s. 17 requests and 17
+replies, with no timeouts or retries.
+
+**Keypad changes reach the model within one poll cycle (≤ 3 s; the M3 done condition).** Zone 1 keypad, one
+press about every 10 s:
+
+| Pressed | State dump |
+|---|---|
+| Vol Up, Vol Up | `vol=36`, `vol=37` |
+| Vol Down ×2 | `vol=36`, `vol=35` |
+| Source ×4 | `src=3`, `src=4`, `src=2` |
+
+Source 1 lasted less than one poll cycle, so it was never sampled. Polling can miss states shorter than about
+3 s, which is acceptable.
+
+**Commands through the engine queue**, each confirmed by the priority poll about 190 ms after sending:
+`on 1`; `vol 1 30` → `35`; `mute 1 on` → `vol=0 MUTED` → `mute 1 off` → `vol=35`; `up 1` → 36 → `down 1` → 35;
+`set 1 bass 2` → `0`. The controller ACKed each Set Data (`handshakes_rx` +1 each). Everything was restored.
+
+**For a zone that is off, all-zone-info reports its turn-on volume as the volume.** All five off zones read
+`vol` equal to their turn-on volume. `set 2 tov 20` on the off zone 2 changed both the turn-on volume reply and the
+all-zone-info volume to 20; `set 2 tov 23` restored both.
+
+Counters over about 3 minutes: 392 tx, 427 rx, 0 checksum errors, 0 timeouts, 0 retries, 0 duplicate replies. One
+partial frame was dropped, during the board reset at the start.
