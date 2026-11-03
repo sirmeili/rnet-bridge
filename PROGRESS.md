@@ -14,7 +14,9 @@
     integration's `api.py`, `coordinator.py`, `config_flow.py` (zeroconf + manual, zones, sources), and
     `__init__.py` (controller device), with strings and translations.
   - Checks: pytest 31/31 on HA 2026.10.4 and on 2026.3.1 (Docker); ruff and mypy clean.
-  - Next: push, check HACS/hassfest/CI on GitHub, then the PR.
+  - GitHub: CI green (firmware, integration on current HA and 2026.3); HACS and hassfest green after setting
+    the repo description and topics (SPEC §5.6).
+  - Next: PR review and merge by the human. Then M6 (entities, options flow).
 
 ## Done before
 - `feat/m4-network` (M4, SPEC §9), merged as PR #7:
