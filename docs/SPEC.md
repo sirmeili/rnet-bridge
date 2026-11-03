@@ -288,19 +288,23 @@ Checksum example (doc)    F0 00 67 7C F1 0F 59 F7
 firmware/
   platformio.ini
   include/config.h            # pins, timings, constants (handshake type, keypad id)
-  src/main.cpp                # setup/loop wiring only
+  src/main.cpp                # setup/loop wiring only (env esp32)
+  src/usb_cli.{h,cpp}         # USB serial state dump + typed commands (stand-in for the network API until M4)
+  src/console/                # M2 bring-up console, built only by env esp32-console (decision 2026-11-02:
+                              #   kept for bring-up on other controller models and for rechecking protocol details)
   lib/rnet/                   # PURE C++, no Arduino deps -> testable on native
     rnet_codec.{h,cpp}        # escape/unescape, checksum, frame builder, frame parser (byte-at-a-time state machine)
     rnet_messages.{h,cpp}     # builders for each template in §3.3, reply parsers for §3.4
-    rnet_engine.{h,cpp}       # queue, single-outstanding request, timeouts, ACKs, polling scheduler, link state
+    rnet_engine.{h,cpp}       # queue, single-outstanding request, timeouts, handshakes, polling scheduler, link state
     zone_model.{h,cpp}        # 6-zone state cache, change detection, mute emulation
+    rnet_text, rnet_duplicate # hex/decode text and duplicate detection for the M2 console
   src/net/
     network.{h,cpp}           # Ethernet first, Wi-Fi fallback, WiFiManager portal, hostname, double-reset detection
     api_server.{h,cpp}        # WebSocket + HTTP endpoints, JSON (de)serialization
     mdns.{h,cpp}
     ota.{h,cpp}
   src/platform/
-    serial_port.{h,cpp}       # adapter between HardwareSerial and the engine's byte I/O interface
+    serial_port.h             # adapter between HardwareSerial and the engine's byte I/O interface
     log.{h,cpp}               # ring buffer + level filtering, mirrored to USB serial and WS subscribers
   test/                       # Unity tests run with `pio test -e native`
 ```
@@ -312,10 +316,17 @@ host with a scripted fake controller.
 - The UART RX is drained every tick into the codec's streaming parser. It resyncs on `F0` and drops partial
   frames on timeout or a bad checksum (increment `checksum_errors`).
 - Commands arriving from WebSocket clients go onto a bounded queue (depth 32). If full, reply with error `busy`.
+- **A command's result is `ok` once its frame is sent** (decision 2026-11-02). The controller doesn't
+  acknowledge events, so the follow-up priority poll is the confirmation (§5.4). A command fails with
+  `link_down` if the link is down when it comes up for sending, and with `invalid` if its arguments are out of
+  range, or if a volume step or mute is sent before the zone's first poll.
 - **Mute emulation** (in `zone_model`): `mute=true` stores the current volume and sets volume to 0. `mute=false`
   restores it (or 10 if the stored value was 0). If a poll shows volume ≠ 0 while muted, clear mute
   (someone changed volume at the keypad). Mute state is RAM-only. It resets on reboot, which is acceptable.
 - Volume up/down commands are applied as set-volume ±1 (raw units) on the cached value, clamped to 0–50.
+  Until a poll confirms a Set Volume, the next step builds on the commanded value, so quick repeated steps
+  add up. **A volume step while muted steps from the stored volume and unmutes** (decision 2026-11-02): from a
+  stored 30, volume up sends 31, not 1.
 
 ### 4.4 Network, provisioning & settings
 **Ethernet first, Wi-Fi fallback (decision 2026-11-02).** The detailed rules below are a proposal. Confirm them

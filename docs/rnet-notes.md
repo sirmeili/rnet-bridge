@@ -12,15 +12,17 @@ answered here, and the matching constants in `firmware/include/config.h` are upd
 | Bridge board | Olimex ESP32-POE-ISO (WROOM) | 2026-11-02 `esptool flash_id`: ESP32-D0WD-V3 (rev v3.1), 40 MHz crystal, 4 MB flash, USB-serial CH340 (VID:PID 1A86:7523). _Board revision printed on the PCB: fill in_ |
 | RS-232 module | Olimex MOD-RS232 Rev A on UEXT | Schematic: T1OUT → DB9 pin 2, R1IN ← DB9 pin 3 |
 | UART pins | GPIO4 TX, GPIO36 RX (UART1) | ESP32-POE-ISO Rev O schematic, UEXT pins 3/4 |
-| Cable | DB9 male-to-male null-modem | _fill in: loopback/first contact result_ |
+| Cable | DB9 male-to-male null-modem | 2026-11-02: loopback PASS through the cable (M0.1), and replies received in both directions (M2.2) |
 
 ## Flashing and the console
 
-From the `firmware/` directory (`pio` is not on PATH on the dev PC, so use `python -m platformio`):
+The bring-up console used for this checklist is the `esp32-console` build env (`src/console/`). The
+default `esp32` env is the engine firmware (M3 onward). From the `firmware/` directory (use
+`python -m platformio` where `pio` isn't on PATH):
 
 ```powershell
-python -m platformio run -e esp32 -t upload          # add --upload-port COMx if several ports exist
-python -m platformio device monitor -b 115200        # Ctrl+C to exit
+pio run -e esp32-console -t upload          # add --upload-port COMx if several ports exist
+pio device monitor -b 115200                # Ctrl+C to exit
 ```
 
 Power the board from USB only during bring-up. Ethernet/PoE isn't needed yet; the ISO board is safe

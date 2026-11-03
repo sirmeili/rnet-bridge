@@ -3,36 +3,34 @@
 ## Done
 - M1 codec merged (PR #2); enclosure merged (PR #3); board switch to ESP32-POE-ISO merged (PR #4).
 - 2026-11-01: Windows dev machine set up. `pio test -e native` passes; `pio run -e esp32` succeeds.
+- 2026-11-02: M0 and M2 merged (PR #5). Every SPEC §11 bring-up question (items 1–10) answered on the CAA6.6;
+  results in `docs/rnet-notes.md`. `kSessionStartEvent = kNone`, `kSendDataAck = false`, and All Zones On is
+  disabled by default.
 
 ## In progress
-- `feat/m2-first-contact`: M2 serial console, diagnostics, and the bring-up checklist in `docs/rnet-notes.md`.
-  Merged with `main` on 2026-11-02. Board flashed with 0.0.2 over USB (COM4, CH340).
-  - M0.1 loopback: PASS (recorded in `rnet-notes.md`).
-  - **M0 and the whole M2 checklist are done (2026-11-02).** All results are in `docs/rnet-notes.md`, with a summary
-    table at the end. The cable works both ways, every request was answered in about 40 ms, and nothing was ever
-    retransmitted. The controller was left as found: zone 1 on, source 2, volume 35, bass 0.
-  - The keypad's power button is broken (hardware). It never sends `6C`.
-  - Follow-ups applied 2026-11-02 with the human's OK:
-    - `config::kSessionStartEvent` → `kNone`, after a clean power-cycle test.
-    - `config::kSendDataAck = false`: the M3 engine sends no data ACKs and treats the controller's `02` handshake
-      after our Set Data as a link-health signal (SPEC §3.5).
-    - All Zones On is a disabled-by-default entity (SPEC §5.4), so users with a controller that supports it can
-      enable it.
-    - SPEC §3.3–§3.9 and §11 now record the answers. `duplicate_replies` counts only replies to our own requests
-      (SPEC §3.5); the M2 console's detector also flags repeated keypad frames, which is fine for bring-up.
-    - Nothing in the current firmware reads the two constants yet; the M3 engine will.
-  - Branch not pushed yet: waiting on the human to confirm the other computer has no unpushed work.
+- `feat/m3-engine` (M3, SPEC §9):
+  - Done: `zone_model` (18 native tests), `rnet_engine` (28 native tests against a scripted fake controller), the
+    `esp32` env running the engine with a USB state dump and commands (`usb_cli`), and the M2 console moved to its
+    own `esp32-console` env (also built in CI).
+  - Checks so far: `pio test -e native` 100/100, and `pio run -e esp32` / `-e esp32-console` both succeed with no
+    warnings.
+  - Next: hardware check with the human. Flash `esp32`, then confirm keypad changes show in the state dump within
+    one poll cycle (about 3 s), and that commands from the USB CLI work. Then open the PR.
 
 ## Next
-- M0 and M2 need the human and the hardware (SPEC §9). M5 onward can proceed without hardware using `fake_bridge.py`.
+- M4 network (needs the open questions below settled). M5 onward can proceed without hardware using `fake_bridge.py`.
 
 ## Decisions
 - 2026-11-01: Run integration tests in Docker on this Windows machine. Home Assistant imports `fcntl`, so
   `pytest-homeassistant-custom-component` cannot load on native Windows. Python 3.14 is required.
 - 2026-11-01: Install PlatformIO 6.2.0 to match the pin in `ci.yml`.
 - 2026-11-02: The hardware is an Olimex ESP32-POE-ISO + MOD-RS232 on the UEXT connector, and the network is Ethernet
-  with Wi-Fi fallback (both human decisions). UART1 on GPIO4 TX / GPIO36 RX, verified against the Rev O schematic
-  on `feat/m2-first-contact`. A male-to-male null-modem cable is required (SPEC §2.3).
+  with Wi-Fi fallback (both human decisions). UART1 on GPIO4 TX / GPIO36 RX, verified against the Rev O schematic.
+  A male-to-male null-modem cable is required (SPEC §2.3).
+- 2026-11-02 (human): keep the M2 console as a separate `esp32-console` build env, for other controller models and
+  later rechecks.
+- 2026-11-02 (human): a command's result is `ok` once its frame is sent; the follow-up poll confirms it (SPEC §4.3).
+- 2026-11-02 (human): a volume step while muted steps from the stored volume and unmutes (SPEC §4.3).
 
 ## Dev environment (Windows)
 - PlatformIO: `uv tool install platformio==6.2.0` (on PATH as `pio`).
@@ -44,6 +42,7 @@
   ```
   So far this environment has only run a smoke test outside the repo, because `tests/` does not exist yet.
 - OpenSCAD 2021.01: `C:\Program Files\OpenSCAD\openscad.exe`, not on PATH.
+- The board shows up as COM4 (CH340) on this PC.
 
 ## Open questions
 - The fallback rules in SPEC §4.4 (10 s Ethernet wait, prefer Ethernet when it returns, when the portal starts) are
@@ -51,4 +50,4 @@
 - SPEC §11 item 11: `wifi_rssi` in `/api/info` on Ethernet (M4).
 - Arduino core version for Ethernet: Olimex's example targets core 3.x, but the pinned platform has core 2.0.17.
   Decide at M4.
-- Does the other dev computer have unpushed work on `feat/m2-first-contact`? Check before pushing this merge.
+- Board revision printed on the PCB: not yet recorded in `docs/rnet-notes.md`.
