@@ -457,6 +457,15 @@ custom_components/rnet_bridge/
 hacs.json              # repo root
 ```
 
+**Implementation notes (M5, 2026-11-03):**
+- **Connection liveness:** the client doesn't use aiohttp's WebSocket heartbeat (its timer outlived the socket in
+  tests). The bridge pings every 15 s, and aiohttp answers automatically. The client treats 75 s without any
+  message as a dead connection, because the bridge sends `link` at least every 30 s.
+- **Schema library:** Home Assistant 2026.9 replaced `voluptuous` with `probatio`, which has the same API. The
+  config flow imports `probatio` and falls back to `voluptuous` on 2026.3–2026.8.
+- **Token or proto refused at setup:** setup fails with a translated `ConfigEntryError`. Reauth and the proto
+  repair issue arrive in M7. On reconnect, the coordinator logs the error and retries every 60 s.
+
 ### 5.3 Config flow
 1. **Discovery:** zeroconf finds `_rnetbridge._tcp` → confirm step showing name and id. The unique id is the
    bridge `id`, so rediscovery with a new IP updates the host. **Manual:** host (+ optional port, token).
@@ -515,6 +524,8 @@ store later. Requirements (per hacs.xyz "Publish → Integration"; re-check the 
   }
   ```
   Set `homeassistant` to the minimum HA version actually tested. 2026.3 is the floor because of inline brand assets (below).
+  CI runs the tests on 2026.3.1 (`pytest-homeassistant-custom-component==0.13.317`, the earliest 2026.3 build)
+  as well as on the version pinned in `requirements_test.txt`.
 - **`manifest.json`** must include at least `domain`, `name`, `version`, `documentation`, `issue_tracker`,
   `codeowners`. Keys are ordered `domain`, `name`, then alphabetical (hassfest enforces this):
   ```json

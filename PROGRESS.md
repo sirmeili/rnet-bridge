@@ -8,7 +8,16 @@
   disabled by default.
 
 ## In progress
-- `feat/m4-network` (M4, SPEC §9):
+- `feat/m5-integration-skeleton` (M5, SPEC §9), worked on unattended at the human's request:
+  - Done: `pyproject.toml`, `requirements_test.txt`, `hacs.json`, `manifest.json`, placeholder brand icons,
+    `validate.yml`, CI integration jobs (current HA and the 2026.3 minimum), `tools/fake_bridge.py`, and the
+    integration's `api.py`, `coordinator.py`, `config_flow.py` (zeroconf + manual, zones, sources), and
+    `__init__.py` (controller device), with strings and translations.
+  - Checks: pytest 31/31 on HA 2026.10.4 and on 2026.3.1 (Docker); ruff and mypy clean.
+  - Next: push, check HACS/hassfest/CI on GitHub, then the PR.
+
+## Done before
+- `feat/m4-network` (M4, SPEC §9), merged as PR #7:
   - Done: `docs/protocol.md` (proto 1 contract); engine raw sends and frame tap; `lib/bridge` (network policy,
     double reset, API JSON); `src/net` (Ethernet, Wi-Fi fallback, portal, API server, mDNS, OTA, settings, log);
     `tools/rnet_cli.py`. Firmware 0.0.3 on min_spiffs partitions.
@@ -44,11 +53,12 @@
 - PlatformIO: `uv tool install platformio==6.2.0` (on PATH as `pio`).
 - Host compiler for native tests: WinLibs g++ via winget. It's on the user PATH, so open a new terminal after installing.
 - ruff and mypy: `.venv` (Python 3.14, gitignored). Its `pytest` does not work; see Decisions.
-- pytest, in Docker with the test environment in the `rnet-bridge-venv` volume. From the repo root in Git Bash:
+- pytest, in Docker. Volumes: `rnet-bridge-venv` (current HA, image `python:3.14-slim` or `python:3.14`) and
+  `rnet-bridge-venv-min` (HA 2026.3.1, image `python:3.14`, which has a compiler). From the repo root in Git Bash:
   ```bash
   MSYS_NO_PATHCONV=1 docker run --rm -v rnet-bridge-venv:/venv -v "$(pwd -W):/src" -w /src python:3.14-slim /venv/bin/pytest tests/
   ```
-  So far this environment has only run a smoke test outside the repo, because `tests/` does not exist yet.
+  Swap the volume name to run on the 2026.3 minimum.
 - OpenSCAD 2021.01: `C:\Program Files\OpenSCAD\openscad.exe`, not on PATH.
 - The board shows up as COM4 (CH340) on this PC.
 

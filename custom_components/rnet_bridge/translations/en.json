@@ -1,0 +1,107 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Add an RNET Bridge",
+        "description": "Enter the address of the bridge. It is usually found automatically on your network.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "token": "API token"
+        },
+        "data_description": {
+          "host": "Hostname or IP address, for example rnet-bridge-1a2b.local.",
+          "port": "Leave at 80 unless you changed it.",
+          "token": "Only if you set an API token in the bridge's setup portal."
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "RNET Bridge found",
+        "description": "Add the RNET Bridge {id} at {host}?",
+        "data": {
+          "token": "API token"
+        },
+        "data_description": {
+          "token": "Only if you set an API token in the bridge's setup portal."
+        }
+      },
+      "zones": {
+        "title": "Zones",
+        "description": "Choose which controller zones to add, and name them. You can change this later.",
+        "data": {
+          "1_enabled": "Zone 1",
+          "1_name": "Zone 1 name",
+          "2_enabled": "Zone 2",
+          "2_name": "Zone 2 name",
+          "3_enabled": "Zone 3",
+          "3_name": "Zone 3 name",
+          "4_enabled": "Zone 4",
+          "4_name": "Zone 4 name",
+          "5_enabled": "Zone 5",
+          "5_name": "Zone 5 name",
+          "6_enabled": "Zone 6",
+          "6_name": "Zone 6 name"
+        }
+      },
+      "sources": {
+        "title": "Sources",
+        "description": "Choose which sources to offer, and name them. Disabled sources are hidden from source lists.",
+        "data": {
+          "1_enabled": "Source 1",
+          "1_name": "Source 1 name",
+          "2_enabled": "Source 2",
+          "2_name": "Source 2 name",
+          "3_enabled": "Source 3",
+          "3_name": "Source 3 name",
+          "4_enabled": "Source 4",
+          "4_name": "Source 4 name",
+          "5_enabled": "Source 5",
+          "5_name": "Source 5 name",
+          "6_enabled": "Source 6",
+          "6_name": "Source 6 name"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unsupported_proto": "The bridge firmware speaks a different API version. Update the bridge firmware or this integration.",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "invalid_discovery": "The discovered device did not identify itself as an RNET Bridge.",
+      "unsupported_proto": "The bridge firmware speaks a different API version. Update the bridge firmware or this integration."
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Could not connect to the RNET Bridge at {host}."
+    },
+    "invalid_auth": {
+      "message": "The RNET Bridge rejected the API token. Remove and re-add the bridge with the right token."
+    },
+    "unsupported_proto": {
+      "message": "The RNET Bridge speaks API version {proto}, but this integration supports version {supported}. Update the bridge firmware or this integration."
+    },
+    "not_connected": {
+      "message": "Could not send {command}: the RNET Bridge is not connected."
+    },
+    "command_busy": {
+      "message": "Could not send {command}: the RNET Bridge is busy. Try again."
+    },
+    "command_invalid": {
+      "message": "The RNET Bridge rejected {command} as invalid."
+    },
+    "command_link_down": {
+      "message": "Could not send {command}: the RNET link to the controller is down."
+    },
+    "command_timeout": {
+      "message": "The RNET Bridge did not answer {command} in time."
+    },
+    "command_failed": {
+      "message": "The RNET Bridge could not run {command}."
+    }
+  }
+}
