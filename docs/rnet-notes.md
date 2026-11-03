@@ -240,4 +240,5 @@ RX F0 00 00 70 00 00 7F 00 00 04 02 00 00 01 00 00 01 00 01 00 23 20 F7
 | 9 All On | Does nothing on this CAA6.6. All Off works |
 | 10 Get Volume offset | None |
 
-`config.h` constants are not changed yet; see PROGRESS.md for the proposed changes.
+Applied 2026-11-02 with the human's OK: `config::kSessionStartEvent = kNone`, `config::kSendDataAck = false`, the
+All Zones On entity disabled by default, and SPEC §3.3–§3.9 and §11 updated to match.

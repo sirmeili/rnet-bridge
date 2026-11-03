@@ -23,10 +23,10 @@ constexpr uint32_t kRnetInterByteTimeoutMs = 50;
 
 constexpr uint32_t kUsbSerialBaud = 115200;
 
-// TODO(SPEC §11.1, §11.7): unverified. Hypothesis is a data handshake of type 0x02
-// (`F0 00 00 7F 00 zz 70 02 02 cs F7`, SPEC §3.5). Determine on hardware in M2: if the same reply
-// arrives again ~2.5 s later, the ACK was not accepted. M2 also checks whether keypad 0x70 needs an
-// ACK at all.
+// SPEC §3.5, verified 2026-11-02 (docs/rnet-notes.md M2.4): with keypad 0x70 the CAA6.6 never
+// retransmits an unacknowledged reply, so the bridge sends no data ACKs. kDataHandshakeType is the
+// type to use if they are ever re-enabled; keypads on the bus ACK the controller with 0x02.
+constexpr bool kSendDataAck = false;
 constexpr uint8_t kDataHandshakeType = 0x02;
 
 // SPEC §11.2, verified 2026-11-02 (docs/rnet-notes.md M2.2): the CAA6.6 answers zone Get/Set with no

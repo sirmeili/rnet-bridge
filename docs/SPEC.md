@@ -146,9 +146,9 @@ F0 | target(ctrl, zone, keypad) | source(ctrl, zone, keypad) | type | body... | 
 **Zone power source zone byte (decision 2026-10-21).** Zone On/Off sends source `00 00 70` (byte 6 = `00`) for
 every zone. The zone is carried in byte 18 only. This matches the PDF §13 hex table verbatim. The PDF's §8.1.1
 template puts `zz` in byte 6 instead. The §3.10 "Zone 2 On" vector previously mixed the two forms (byte 6 =
-`01` with the table's checksum `13`), and has been corrected to the table's frame. Whether `zz` is also
-accepted is checked in M2 (§11 item 8). Every other zone command keeps `zz` in byte 6, and Source Select needs
-it, because byte 6 is its only zone field.
+`01` with the table's checksum `13`), and has been corrected to the table's frame. Verified 2026-11-02: the
+CAA6.6 accepts both `00` and `zz` in byte 6 (§11 item 8); keep `00`. Every other zone command keeps `zz` in
+byte 6, and Source Select needs it, because byte 6 is its only zone field.
 
 Zone param ids `pp`: `00` bass, `01` treble, `02` loudness, `03` balance, `04` turn-on volume.
 Value encodings:
@@ -180,37 +180,44 @@ F0 00 zz 70 00 00 7F 00 00 04 02 00 zz 07 00 00 01 00 0C 00 [d0..d10] 00 cs F7
 | 30 | party mode (N/A on CAA6.6 — ignore) |
 | 31 | DND (N/A on CAA6.6 — ignore) |
 
-Turn-on volume is **not** in all-zone-info. Fetch it with `Get zone param pp=04`. The expected reply is
-`F0 00 zz 70 00 00 7F 00 00 05 02 00 zz 00 04 00 00 01 00 01 00 vv cs F7`.
+The source byte is only meaningful while the zone is on. On the CAA6.6, a zone that was off read source 1, came
+on at source 4, and then read 4 when off again (`docs/rnet-notes.md` M2.3).
+
+Turn-on volume is **not** in all-zone-info. Fetch it with `Get zone param pp=04`. The reply, verified on
+hardware, is `F0 00 zz 70 00 00 7F 00 00 05 02 00 zz 00 04 00 00 01 00 01 00 vv cs F7`.
 
 **Parse replies by message type + path bytes, never by fixed total length.** Handle unknown frames by
 logging and discarding them.
 
-### 3.5 Handshake / ACK — MUST VERIFY ON HARDWARE
-Every Set Data reply the controller sends in response to our Request **must be acknowledged**.
-Otherwise the controller retransmits and the bus stalls about 2.5 s.
-- The doc shows only an *event* handshake example: `F0 00 00 60 00 7D 00 02 06 5E F7`
-  (target = the device being acknowledged, source = acknowledger, type `02`, handshake type `06` = event).
-- **Working hypothesis** for the data handshake: `F0 00 00 7F 00 zz 70 02 02 cs F7`
-  (target = controller, source = us, type `02`, handshake type `02`).
-- The handshake-type byte must be a single constant that is easy to change. Bring-up (§9, M2) determines
-  the correct value. The test: if a reply arrives again with identical content about 2.5 s later, the
-  ACK was not accepted. Track this as `duplicate_replies` in stats.
-- The controller sends us ACKs after our Set Data messages. Accept and ignore them, but use them as
-  link-health signals.
+### 3.5 Handshake / ACK (verified on hardware 2026-11-02)
+**Decision (2026-11-02): the bridge sends no data ACKs.** With keypad ID `0x70`, the CAA6.6 never retransmitted a
+reply that was not acknowledged, across 40+ requests and commands in M2 (`docs/rnet-notes.md` M2.4). This matches
+PDF §11: a peripheral using keypad `0x70` does not require handshaking.
+- `config::kSendDataAck = false`. `config::kDataHandshakeType = 0x02` stays as the type to use if ACKs are ever
+  re-enabled. Keypads on the bus ACK the controller's Set Data with that type:
+  `F0 00 00 7F 00 zz kk 02 02 cs F7` (target = controller, source = the keypad).
+- **The controller ACKs our Set Data**: `F0 00 zz 70 00 00 7F 02 02 cs F7` (target = us, handshake type `02`),
+  within about 25 ms. It sends no handshake after our events (power, source, volume, All Off). Accept these
+  ACKs without replying, and use them as link-health signals.
+- The doc's *event* handshake example `F0 00 00 60 00 7D 00 02 06 5E F7` (target = the device being
+  acknowledged, source = acknowledger, handshake type `06` = event) remains a codec vector only.
+- `duplicate_replies` counts a reply to one of **our** requests that arrives again with identical content. The
+  port also repeats keypad bus traffic (§3.8), and repeated keypad frames must not be counted.
 
 ### 3.6 Session start
-The doc says at least one Event must be sent before zone-specific Get/Set works. On boot and after any
-RNET link loss, send the **Device Restart event**:
-`F0 00 00 7F 00 00 70 05 02 02 00 00 55 01 03 00 35 00 01 cs F7`
-(the doc specifies keypad `71` for ACA-E5; use `70` here). If the CAA6.6 ignores it, fall back to a
-harmless event (to be decided in bring-up). Verify on hardware.
+**Not needed on the CAA6.6 (verified 2026-11-02).** The PDF says at least one Event must be sent before
+zone-specific Get/Set works. On hardware, the bridge's first frame after a controller power-cycle (`Get all zone
+info`, with no keypad use and nothing sent before it) was answered in 40 ms. `config::kSessionStartEvent =
+kNone`. The **Device Restart event** builder stays available for other controllers and for the M2 console:
+`F0 00 00 7F 00 00 70 05 02 02 00 00 55 01 03 00 35 00 01 cs F7` (the doc specifies keypad `71` for ACA-E5;
+use `70` here).
 
 ### 3.7 Timing
-- One outstanding request at a time. Wait for its reply (default timeout 500 ms), send the ACK, then proceed.
+- One outstanding request at a time. Wait for its reply (default timeout 500 ms), then proceed. No ACK is sent (§3.5).
 - Minimum inter-frame gap: 50 ms (configurable; the doc suggests about 100 ms when not handshaking).
 - Retries: up to 2 for requests. Commands (events/sets) are not retried blindly. Correctness comes from the follow-up poll.
-- Link considered **down** after 5 consecutive timeouts. On recovery, resend the session-start event.
+- Link considered **down** after 5 consecutive timeouts. On recovery, send the session-start event if one is
+  configured (none by default, §3.6).
 
 ### 3.8 Polling strategy
 - Round-robin `Get all zone info` across **all 6 zones**. Default: one zone every 500 ms, so a full cycle is about 3 s.
@@ -219,8 +226,10 @@ harmless event (to be decided in bring-up). Verify on hardware.
   sees confirmed state quickly. Commands jump ahead of routine polls in the queue.
 - Turn-on volume: poll on session start, after a set, and every 60 s per zone.
 - Only publish `zone_state` to clients when something changed. Also publish a full snapshot on client connect.
-- During bring-up, check whether the controller emits any unsolicited messages on keypad changes. If it
-  does, document them. They are not required for v1.
+- **The controller's RS-232 port repeats keypad bus traffic** (verified 2026-11-02, `docs/rnet-notes.md` M2.1):
+  keypad button events, the controller's updates to keypads, handshakes, and a status broadcast every 60 s. v1
+  does not use them: polling stays the source of truth. The parser must accept and discard frames that aren't
+  replies to us without counting errors.
 
 ### 3.9 Known errors in the PDF (do not copy these)
 The full list, with evidence, is in Appendix A of `docs/reference/russound-rnet-protocol.md`. The ones that
@@ -228,15 +237,16 @@ matter for implementation:
 - §6.2 "Zone 1, Menu" breakdown lists checksum `7B`. The correct value is `4E`, as shown in the example line.
 - §6.2 "Zone 3, Record" example prints checksum `49`. The correct value is `4F`.
 - §8.8.3 Get Turn On Volume reply template shows path `04 02 00 zz 01 00 ...` (copied from Volume). The
-  expected path is `05 02 00 zz 00 04`. Verify on hardware.
+  real path is `05 02 00 zz 00 04` (confirmed on hardware 2026-11-02).
 - §8.8.1 describes Plus/Minus for turn-on volume as "More Left/More Right" (copy-paste error).
-- §8.3.2 Get Volume reply says "Volume Level -1". This is likely a copy-paste from Get Source. Volume is raw
-  0–50 everywhere else.
+- §8.3.2 Get Volume reply says "Volume Level -1". This is a copy-paste from Get Source: on hardware the value
+  equals all-zone-info's raw volume, with no offset (confirmed 2026-11-02).
 - §3.1 omits the data bits. The port is 8N1.
 - The §13 hex table's Zone Vol Down rows render ambiguously. The correct Zone 1 frame is in §3.10 below.
 - §8.1.1 (Zone On/Off template) puts the zone in the Source Zone ID (byte 6), but the §13 hex table sends
   `00` there for every zone. Both have valid checksums. See §11.
 - The Quick Reference table marks **Set All Zones On as unsupported on the CAA66** (All Off is supported).
+  Consistent with hardware: on the CAA6.6 tested, All On did nothing and All Off worked (2026-11-02).
 - (Removed 2026-10-21: an earlier entry said §3.2 reads "DB-96". The PDF reads "Female DB-9". The "6" came
   from text extraction.)
 
@@ -427,7 +437,7 @@ Use `selector`-based schemas. Store zone/source config in `entry.options`. Store
 `sw_version` = firmware version, configuration_url = `http://<host>/`.
 | Entity | Platform | Notes |
 |---|---|---|
-| All Zones On | button | Only affects zones with "System On Enable" in controller programming |
+| All Zones On | button | **Disabled by default** (`entity_registry_enabled_default = False`). Only affects zones with "System On Enable" in controller programming; it did nothing on the CAA6.6 tested (§11 item 9). Users whose controller supports it enable the entity in HA |
 | All Zones Off | button | |
 | Resync | button | Sends `refresh` for all zones |
 | RNET Link | binary_sensor | device_class `connectivity`, entity_category `diagnostic` |
@@ -548,7 +558,8 @@ entity translations, diagnostics, reauth if a token is added later, unavailable 
 ## 8. Testing strategy
 - **Firmware unit tests** (`pio test -e native`): all §3.10 vectors; escape round-trip for every byte 0x80–0xFF;
   streaming parser resync (garbage before F0, truncated frames, bad checksum); all-zone-info parsing;
-  engine behaviour with a scripted fake controller (ACK sent after replies, timeout → retry → link down,
+  engine behaviour with a scripted fake controller (no ACK sent after replies, controller handshakes accepted
+  and counted as link health, keypad traffic ignored, timeout → retry → link down,
   priority poll after command, queue-full error, mute emulation edge cases).
 - **Integration tests** (pytest): config flow (zeroconf, manual, invalid host, unsupported proto), options flow
   removing a zone removes its device, entity states from fake bridge snapshots, command → result path,
@@ -569,7 +580,7 @@ Each milestone ends in something testable. Hardware steps need the human.
   **determine the correct data-handshake format (§3.5)**, check whether the session-start event is needed
   (§3.6), and check the turn-on-volume reply format. Also run the M2 checks in §11 items 7–10. Record findings in
   `docs/rnet-notes.md` and update the constants.
-- **M3 — Engine.** Queue, ACKs, polling, link state, zone model, mute emulation. Keypad changes show up in the
+- **M3 — Engine.** Queue, handshake handling (§3.5), polling, link state, zone model, mute emulation. Keypad changes show up in the
   USB-serial state dump within one poll cycle.
 - **M4 — Network.** Ethernet with Wi-Fi fallback (§4.4), WiFiManager portal, NVS settings, mDNS, `/api/info`, WebSocket API per `docs/protocol.md`,
   status page, OTA. Exercise with `tools/rnet_cli.py`.
@@ -599,22 +610,26 @@ Each milestone ends in something testable. Hardware steps need the human.
 ---
 
 ## 11. Open questions to resolve during bring-up
-1. Exact data-handshake (ACK) frame (§3.5).
-2. Whether the CAA6.6 requires/accepts the Device Restart event to unlock zone Get/Set (§3.6).
-3. Turn-on volume Get reply format (§3.4, §3.9).
-4. Whether tone/turn-on-volume Set Data works while a zone is off.
+Items 1–10 were answered on hardware in M2 (2026-11-02). Evidence is in `docs/rnet-notes.md`.
+
+1. Exact data-handshake (ACK) frame (§3.5). **Answered:** no ACK is needed (see item 7). The controller ACKs our
+   Set Data with handshake type `02`.
+2. Whether the CAA6.6 requires/accepts the Device Restart event to unlock zone Get/Set (§3.6). **Answered:** not
+   required, even straight after a power-cycle.
+3. Turn-on volume Get reply format (§3.4, §3.9). **Answered:** path `05 02 00 zz 00 04`, as expected.
+4. Whether tone/turn-on-volume Set Data works while a zone is off. **Answered:** yes (bass tested).
 5. Whether the controller emits any unsolicited frames when keypads are used (could reduce polling).
+   **Answered:** yes, the port repeats keypad bus traffic (§3.8). Not used in v1.
 6. Whether keypad displays need a nudge to refresh after a Set Data change (doc says they won't auto-update).
-   This is acceptable for v1, but should be noted.
+   **Answered:** after a bass Set Data, the keypad showed the new value when its bass setting was opened. No
+   nudge is needed.
 7. **Is the ACK needed at all with keypad ID `0x70`?** PDF §11 says a Peripheral Source "does not require
    Handshaking when the keypad ID used to send data is 0x70", and recommends `0x60` when handshaking is wanted.
-   M2 test: send `Get all zone info` with **no** ACK, and watch whether the reply is retransmitted about
-   2.5 s later. Repeat with the hypothesised ACK (§3.5). Record both results.
+   **Answered:** no. Replies were never retransmitted without an ACK.
 8. **Zone On/Off Source Zone ID (byte 6).** Does the controller accept `zz` (PDF §8.1.1 template, SPEC §3.3)
-   and `00` (PDF §13 hex table)? Test Zone 2 On both ways.
-9. **All Zones On on the CAA6.6.** The PDF Quick Reference says it is unsupported on the CAA66. Test whether it
-   does anything. If not, drop or hide the All Zones On button (§5.4).
-10. **Get Volume reply value.** Check whether PDF §8.3.2's "Volume Level -1" is real, by comparing it against
-    all-zone-info byte 23. This only matters if discrete Get Volume is ever used.
+   and `00` (PDF §13 hex table)? **Answered:** both work; keep `00`.
+9. **All Zones On on the CAA6.6.** The PDF Quick Reference says it is unsupported on the CAA66. **Answered:** All
+   On does nothing on the CAA6.6 tested; All Off works. The All Zones On button is disabled by default (§5.4).
+10. **Get Volume reply value.** Check whether PDF §8.3.2's "Volume Level -1" is real. **Answered:** no offset.
 11. **`/api/info` on Ethernet (M4).** `wifi_rssi` has no meaning on Ethernet. Decide whether to send `null` or add
     an interface field. Either changes the contract, so `docs/protocol.md` and `proto` rules apply.

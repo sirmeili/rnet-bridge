@@ -12,15 +12,15 @@
     table at the end. The cable works both ways, every request was answered in about 40 ms, and nothing was ever
     retransmitted. The controller was left as found: zone 1 on, source 2, volume 35, bass 0.
   - The keypad's power button is broken (hardware). It never sends `6C`.
-  - Proposed follow-ups, **waiting for the human's OK**:
-    - Done 2026-11-02 (human OK): `config::kSessionStartEvent` → `kNone`, after a clean power-cycle test. Nothing
-      uses the constant yet; the M3 engine will.
-    - M3 engine: don't send data ACKs (not needed for keypad `0x70`). Treat the controller's `02` handshake after
-      our Set Data as a link-health signal (SPEC §3.5).
-    - SPEC §5.4: drop or hide the All Zones On button (it does nothing on this CAA6.6).
-    - SPEC §3.5/§3.6/§11: mark the answered questions, pointing to `rnet-notes.md`.
-    - The console's duplicate detector flags repeated keypad presses and the controller's 60 s broadcast. Fine for
-      M2; the M3 `duplicate_replies` stat must count only replies to the bridge's own requests.
+  - Follow-ups applied 2026-11-02 with the human's OK:
+    - `config::kSessionStartEvent` → `kNone`, after a clean power-cycle test.
+    - `config::kSendDataAck = false`: the M3 engine sends no data ACKs and treats the controller's `02` handshake
+      after our Set Data as a link-health signal (SPEC §3.5).
+    - All Zones On is a disabled-by-default entity (SPEC §5.4), so users with a controller that supports it can
+      enable it.
+    - SPEC §3.3–§3.9 and §11 now record the answers. `duplicate_replies` counts only replies to our own requests
+      (SPEC §3.5); the M2 console's detector also flags repeated keypad frames, which is fine for bring-up.
+    - Nothing in the current firmware reads the two constants yet; the M3 engine will.
   - Branch not pushed yet: waiting on the human to confirm the other computer has no unpushed work.
 
 ## Next
