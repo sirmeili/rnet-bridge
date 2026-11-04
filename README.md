@@ -19,7 +19,7 @@ For each zone you enable:
 |---|---|
 | Media player (named after the zone) | Power, volume (one step = 2 on the keypad), mute, source selection |
 | Bass, Treble, Balance | −10 … +10 sliders |
-| Turn-on volume | 0–100 %, as the keypad shows it |
+| Turn-on volume | 0–100 %, as the keypad shows it. Changing it doesn't change what's playing now |
 | Loudness | On/off switch |
 
 On the controller device: **All zones off**, **Resync**, an **RNET link** sensor, and diagnostic counters
@@ -53,11 +53,15 @@ pip install esptool
 esptool.py --chip esp32 --port COM4 write_flash 0x0 firmware-factory.bin   # your serial port here
 ```
 
-Later updates can go over the network with the release's `firmware.bin`:
+Later updates can go over the network with the release's `firmware.bin`. Run this from the folder that holds
+the file; it prints `{"ok":true}` and the bridge restarts by itself:
 
 ```bash
 curl -F "firmware=@firmware.bin" http://rnet-bridge-xxxx.local/api/ota
 ```
+
+On Windows PowerShell, type `curl.exe`, not `curl`: plain `curl` is PowerShell's `Invoke-WebRequest`, which rejects
+`-F`.
 
 Always use the **firmware and integration from the same release**. Their API version must match, and Home
 Assistant shows a repair notice if it doesn't.
@@ -80,13 +84,29 @@ optional API token and OTA password.
    **Russound RNET Bridge** and enter the bridge's address.
 3. Choose which zones and sources to use, and name them. You can change this later under **Configure**.
 
+## Known limitations
+
+- **Changing a zone's turn-on volume while it's playing (CAA6.6).** The controller itself sets the zone's current
+  volume to the new turn-on volume. The bridge puts the volume straight back about 50 ms later, so small changes
+  go unnoticed, but a big jump (say from a playing level of 70 % to a turn-on volume of 0 % or 100 %) can be heard
+  as a short blip. This was tested with both RNET command forms for turn-on volume: the Set Data (`0x00`) and the
+  Plus/Minus Event (`0x05`). The controller behaved the same with both.
+
+  **Have a different RNET controller?** If yours changes the turn-on volume *without* touching the volume that's
+  playing, with either command form, please [open an issue](https://github.com/sirmeili/rnet-bridge/issues) with
+  your model. We can make a test build with an option to turn the volume restore off for your controller, or to
+  use the Event form.
+- Only one device can use the controller's RS-232 port.
+- **All zones on** does nothing on the CAA6.6, so that button is disabled by default.
+
 ## Troubleshooting
 
 - **Entities unavailable**: the bridge is offline, or the **RNET link** sensor is off (check the cable, and that
   nothing else is on the RS-232 port).
 - **Download diagnostics** from the integration's menu: it includes the bridge's link counters, with the API
   token redacted.
-- **Developer tool**: the `rnet_bridge.send_raw` action sends raw RNET bytes through the bridge.
+- **Developer tool**: the `rnet_bridge.send_raw` action sends raw RNET bytes through the bridge, exactly as
+  given. It skips the bridge's safeguards, including the volume restore after a turn-on volume change.
 
 ## Development
 

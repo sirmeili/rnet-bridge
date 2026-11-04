@@ -151,6 +151,10 @@ CAA6.6 accepts both `00` and `zz` in byte 6 (§11 item 8); keep `00`. Every othe
 byte 6, and Source Select needs it, because byte 6 is its only zone field.
 
 Zone param ids `pp`: `00` bass, `01` treble, `02` loudness, `03` balance, `04` turn-on volume.
+**Turn-on volume on a playing zone (verified 2026-11-04):** the CAA6.6 also sets the zone's current volume to the new
+turn-on volume, with both the Set Data and the §8.8.1 Event forms. The engine therefore follows a turn-on volume
+change on a zone that is on with a Set Volume back to the zone's current volume, as the next frame
+(`EngineConfig::restore_volume_after_turn_on_volume`, on by default). Evidence: `docs/rnet-notes.md`.
 Value encodings:
 - Volume and turn-on volume: 0x00–0x32 (0–50; keypad shows ×2, i.e. 0–100).
 - Bass, treble, balance: 0x00–0x14 (0x0A = flat/center). Bass/treble: value − 10 = dB step. Balance: 0x00 = full left.

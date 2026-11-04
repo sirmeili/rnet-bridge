@@ -279,6 +279,21 @@ bool Engine::send_next(uint32_t now_ms) {
     }
   }
 
+  // A volume restore follows its turn-on volume change before anything else, so the level
+  // change is as short as possible.
+  for (uint8_t z = 1; z <= kNumZones; ++z) {
+    if (restore_due_[z - 1]) {
+      restore_due_[z - 1] = false;
+      WireFrame f{};
+      if (link_up_ && build_set_volume(z, restore_volume_[z - 1], f)) {
+        transmit(f, now_ms);
+        model_.note_commanded_volume(z, restore_volume_[z - 1]);
+        schedule_priority_poll(z, now_ms);
+        return true;
+      }
+    }
+  }
+
   // Commands jump ahead of polls (SPEC §3.8). Some complete without sending anything.
   while (queue_count_ > 0) {
     const Command cmd = queue_[queue_head_];
@@ -367,6 +382,11 @@ bool Engine::send_command(const Command& c, uint32_t now_ms) {
       built = build_set_zone_param(c.zone, c.param, static_cast<int8_t>(c.value), f);
       if (built && c.param == ZoneParam::kTurnOnVolume) {
         schedule_turn_on_volume(c.zone, now_ms + cfg_.priority_poll_delay_ms);
+        const ZoneState& z = model_.zone(c.zone);
+        if (cfg_.restore_volume_after_turn_on_volume && z.valid && z.power) {
+          restore_due_[c.zone - 1] = true;
+          restore_volume_[c.zone - 1] = model_.current_volume(c.zone);
+        }
       }
       break;
     case CommandType::kAllOn:

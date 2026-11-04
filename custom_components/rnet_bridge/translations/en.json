@@ -222,7 +222,7 @@
   "services": {
     "send_raw": {
       "name": "Send raw RNET frame",
-      "description": "Debug tool: sends raw bytes to the controller through the bridge. Use with care.",
+      "description": "Debug tool: sends raw bytes to the controller through the bridge, exactly as given. It bypasses the bridge's safeguards, such as restoring a playing zone's volume after a turn-on volume change. Use with care.",
       "fields": {
         "config_entry_id": {
           "name": "Bridge",
