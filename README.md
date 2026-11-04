@@ -105,7 +105,8 @@ optional API token and OTA password.
   nothing else is on the RS-232 port).
 - **Download diagnostics** from the integration's menu: it includes the bridge's link counters, with the API
   token redacted.
-- **Developer tool**: the `rnet_bridge.send_raw` action sends raw RNET bytes through the bridge.
+- **Developer tool**: the `rnet_bridge.send_raw` action sends raw RNET bytes through the bridge, exactly as
+  given. It skips the bridge's safeguards, including the volume restore after a turn-on volume change.
 
 ## Development
 
