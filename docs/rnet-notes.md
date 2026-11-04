@@ -339,4 +339,8 @@ doesn't. For a zone that is off, only the reported volume follows (see the M3 ch
 **Workaround (firmware, `EngineConfig::restore_volume_after_turn_on_volume`, on by default):** after a turn-on
 volume change on a zone that is on, the engine sends a Set Volume back to the zone's current volume as the next
 frame, about 50 ms later. On hardware, zone 1 stayed at volume 34 while its turn-on volume went 18 → 30 → 27 → 18;
-the reported volume never showed the change. Whether the 50 ms change is audible is up to the human to judge.
+the reported volume never showed the change. The human, listening with music playing: no change heard for normal
+steps; **a short blip is audible for extreme jumps** (e.g. playing at 35 raw with turn-on volume set to 0 or 50).
+Judged acceptable (2026-11-04). The README invites owners of other controllers that don't move the live volume to
+open an issue; a test build would turn the restore off (`restore_volume_after_turn_on_volume = false`) or use the
+Event form.

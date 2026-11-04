@@ -84,6 +84,21 @@ optional API token and OTA password.
    **Russound RNET Bridge** and enter the bridge's address.
 3. Choose which zones and sources to use, and name them. You can change this later under **Configure**.
 
+## Known limitations
+
+- **Changing a zone's turn-on volume while it's playing (CAA6.6).** The controller itself sets the zone's current
+  volume to the new turn-on volume. The bridge puts the volume straight back about 50 ms later, so small changes
+  go unnoticed, but a big jump (say from a playing level of 70 % to a turn-on volume of 0 % or 100 %) can be heard
+  as a short blip. This was tested with both RNET command forms for turn-on volume: the Set Data (`0x00`) and the
+  Plus/Minus Event (`0x05`). The controller behaved the same with both.
+
+  **Have a different RNET controller?** If yours changes the turn-on volume *without* touching the volume that's
+  playing, with either command form, please [open an issue](https://github.com/sirmeili/rnet-bridge/issues) with
+  your model. We can make a test build with an option to turn the volume restore off for your controller, or to
+  use the Event form.
+- Only one device can use the controller's RS-232 port.
+- **All zones on** does nothing on the CAA6.6, so that button is disabled by default.
+
 ## Troubleshooting
 
 - **Entities unavailable**: the bridge is offline, or the **RNET link** sensor is off (check the cable, and that
