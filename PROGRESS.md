@@ -19,6 +19,8 @@
   the bridge.
 
 ## Next
+- Option B for turn-on volume ("wait until the zone is off"), as a setting: plan in
+  `docs/plans/turn-on-volume-defer.md`. Waiting on two human decisions (default mode; integration vs firmware).
 - M8 hardening (SPEC §9): 48 h soak; Ethernet/Wi-Fi drop and controller power-cycle recovery; HA restart; OTA
   from the HA host. Also test the API token and OTA password on hardware (never set so far).
 - Firmware for the enclosure's WS2812 status LED: confirm wiring and voltage first. Not in SPEC yet; ask the
