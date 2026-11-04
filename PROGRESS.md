@@ -8,17 +8,19 @@
   disabled by default.
 
 ## In progress
-- `feat/m5-integration-skeleton` (M5, SPEC §9), worked on unattended at the human's request:
-  - Done: `pyproject.toml`, `requirements_test.txt`, `hacs.json`, `manifest.json`, placeholder brand icons,
-    `validate.yml`, CI integration jobs (current HA and the 2026.3 minimum), `tools/fake_bridge.py`, and the
-    integration's `api.py`, `coordinator.py`, `config_flow.py` (zeroconf + manual, zones, sources), and
-    `__init__.py` (controller device), with strings and translations.
-  - Checks: pytest 31/31 on HA 2026.10.4 and on 2026.3.1 (Docker); ruff and mypy clean.
-  - GitHub: CI green (firmware, integration on current HA and 2026.3); HACS and hassfest green after setting
-    the repo description and topics (SPEC §5.6).
-  - Next: PR review and merge by the human. Then M6 (entities, options flow).
+- `feat/m6-entities` (M6, SPEC §9):
+  - Done: `entity.py` (controller/zone bases, availability rules), media_player, number (bass, treble,
+    balance, turn-on volume as %), switch (loudness), button (All On disabled by default, All Off, Resync),
+    binary_sensor (RNET link), sensor (counters, disabled by default), options flow (zones and sources, reload),
+    stale zone-device cleanup, entity translations and `icons.json`.
+  - HA compatibility handled: `via_device` vs `via_device_id`, `suggested_area` deprecated from 2026.9,
+    platform enums imported from the package (2026.3 has no `binary_sensor.const`).
+  - Checks: pytest 44/44 on HA 2026.10.4 and 2026.3.1 with no deprecation warnings; ruff and mypy clean.
+  - Next: push, CI/HACS/hassfest, PR.
 
 ## Done before
+- `feat/m5-integration-skeleton` (M5), merged as PR #8: client, coordinator, config flow, HACS files, fake
+  bridge, 31 tests on HA 2026.10 and 2026.3.
 - `feat/m4-network` (M4, SPEC §9), merged as PR #7:
   - Done: `docs/protocol.md` (proto 1 contract); engine raw sends and frame tap; `lib/bridge` (network policy,
     double reset, API JSON); `src/net` (Ethernet, Wi-Fi fallback, portal, API server, mDNS, OTA, settings, log);

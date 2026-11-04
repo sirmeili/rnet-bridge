@@ -60,6 +60,9 @@ class RnetBridgeCoordinator(DataUpdateCoordinator[BridgeData]):
             hass, _LOGGER, config_entry=entry, name=DOMAIN, update_interval=None
         )
         self.client = client
+        # Device registry id of the controller device, set by async_setup_entry;
+        # zone devices link to it (SPEC §5.4).
+        self.controller_device_id: str = ""
 
     @property
     def bridge_id(self) -> str:

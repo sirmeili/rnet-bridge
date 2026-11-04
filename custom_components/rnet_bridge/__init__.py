@@ -21,12 +21,20 @@ from .const import (
     DEFAULT_PORT,
     DOMAIN,
     MANUFACTURER,
+    NUM_ZONES,
     SUPPORTED_PROTO,
 )
 from .coordinator import RnetBridgeCoordinator
+from .entity import controller_identifier, zone_enabled, zone_identifier
 
-# Entity platforms arrive in M6 (SPEC §9).
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.MEDIA_PLAYER,
+    Platform.NUMBER,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 type RnetConfigEntry = ConfigEntry[RnetBridgeCoordinator]
 
@@ -65,9 +73,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool
 
     entry.runtime_data = coordinator
 
-    dr.async_get(hass).async_get_or_create(
+    controller = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, coordinator.bridge_id)},
+        identifiers={controller_identifier(coordinator.bridge_id)},
         manufacturer=MANUFACTURER,
         model=CONTROLLER_MODEL,
         name=CONTROLLER_NAME,
@@ -75,9 +83,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool
         configuration_url=f"http://{host}:{port}/" if port != 80 else f"http://{host}/",
     )
 
+    coordinator.controller_device_id = controller.id
+    _async_remove_stale_devices(hass, entry, coordinator.bridge_id)
+
     coordinator.start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # The options flow changes zones/sources: reload to rebuild entities (SPEC §5.3).
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: RnetConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+def _async_remove_stale_devices(
+    hass: HomeAssistant, entry: RnetConfigEntry, bridge_id: str
+) -> None:
+    """Remove zone devices for zones that are now disabled (SPEC §5.3)."""
+    registry = dr.async_get(hass)
+    wanted = {controller_identifier(bridge_id)} | {
+        zone_identifier(bridge_id, z)
+        for z in range(1, NUM_ZONES + 1)
+        if zone_enabled(entry.options, z)
+    }
+    for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
+        if not device.identifiers & wanted:
+            registry.async_update_device(
+                device.id, remove_config_entry_id=entry.entry_id
+            )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool:

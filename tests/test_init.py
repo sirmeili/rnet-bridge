@@ -7,7 +7,7 @@ from collections.abc import Callable
 from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_TOKEN
+from homeassistant.const import CONF_TOKEN, MAJOR_VERSION, MINOR_VERSION
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -35,9 +35,17 @@ async def test_setup_and_unload(hass: HomeAssistant, fake_bridge: FakeBridge) ->
 
     # Works on the hacs.json minimum (2026.3) and current releases alike.
     devices = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
-    assert len(devices) == 1
-    device = devices[0]
+    by_id = {next(iter(d.identifiers))[1]: d for d in devices}
+    assert set(by_id) == {BRIDGE_ID} | {f"{BRIDGE_ID}_zone{z}" for z in range(1, 7)}
+    device = by_id[BRIDGE_ID]
     assert device.identifiers == {(DOMAIN, BRIDGE_ID)}
+    # Zone devices hang off the controller (via_device / via_device_id by HA version).
+    zone1 = by_id[f"{BRIDGE_ID}_zone1"]
+    assert zone1.via_device_id == device.id
+    assert zone1.name == "Zone 1"
+    # suggested_area is only set before HA 2026.9, which deprecates it.
+    if (MAJOR_VERSION, MINOR_VERSION) < (2026, 9):
+        assert zone1.suggested_area == "Zone 1"
     assert device.name == "Russound Controller"
     assert device.model == "RNET Bridge"
     assert device.sw_version == "0.0.0-fake"

@@ -5,8 +5,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TOKEN
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
@@ -75,6 +81,16 @@ def _items_defaults(count: int, label: str) -> dict[str, Any]:
     return defaults
 
 
+def _items_current(items: dict[str, dict[str, Any]], count: int) -> dict[str, Any]:
+    """Stored options -> form values, to pre-fill the options flow."""
+    values: dict[str, Any] = {}
+    for n in range(1, count + 1):
+        item = items.get(str(n), {})
+        values[_enabled_key(n)] = bool(item.get(CONF_ENABLED, True))
+        values[_name_key(n)] = item.get("name", "")
+    return values
+
+
 def _items_from_input(
     user_input: dict[str, Any], count: int, label: str
 ) -> dict[str, dict[str, Any]]:
@@ -93,6 +109,12 @@ class RnetBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
     """Add an RNET Bridge."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> RnetBridgeOptionsFlow:
+        """Zones and sources can be changed at any time (SPEC §5.3)."""
+        return RnetBridgeOptionsFlow()
 
     def __init__(self) -> None:
         """Start a new flow."""
@@ -226,4 +248,49 @@ class RnetBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_ZONES: self._zones,
                 CONF_SOURCES: _items_from_input(user_input, NUM_SOURCES, "Source"),
             },
+        )
+
+
+class RnetBridgeOptionsFlow(OptionsFlow):
+    """Re-run the zones and sources steps. Saving reloads the entry, which adds
+    entities for newly enabled zones and removes devices of disabled ones."""
+
+    def __init__(self) -> None:
+        """Start with no changes."""
+        self._zones: dict[str, dict[str, Any]] = {}
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Zones first."""
+        return await self.async_step_zones()
+
+    async def async_step_zones(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Enable and rename zones."""
+        if user_input is not None:
+            self._zones = _items_from_input(user_input, NUM_ZONES, "Zone")
+            return await self.async_step_sources()
+        schema = self.add_suggested_values_to_schema(
+            _items_schema(NUM_ZONES),
+            _items_current(self.config_entry.options[CONF_ZONES], NUM_ZONES),
+        )
+        return self.async_show_form(step_id="zones", data_schema=schema)
+
+    async def async_step_sources(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Enable and rename sources, then save."""
+        if user_input is None:
+            schema = self.add_suggested_values_to_schema(
+                _items_schema(NUM_SOURCES),
+                _items_current(self.config_entry.options[CONF_SOURCES], NUM_SOURCES),
+            )
+            return self.async_show_form(step_id="sources", data_schema=schema)
+        return self.async_create_entry(
+            data={
+                CONF_ZONES: self._zones,
+                CONF_SOURCES: _items_from_input(user_input, NUM_SOURCES, "Source"),
+            }
         )

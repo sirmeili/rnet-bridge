@@ -30,6 +30,12 @@ warn_unreachable = true
 explicit_package_bases = true
 mypy_path = "."
 
+[[tool.mypy.overrides]]
+# HA platform packages re-export their enums without __all__; older releases (the
+# hacs.json minimum) have no separate const module to import them from instead.
+module = "homeassistant.*"
+implicit_reexport = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
