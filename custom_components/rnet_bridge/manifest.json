@@ -1,7 +1,9 @@
 {
   "domain": "rnet_bridge",
   "name": "Russound RNET Bridge",
-  "codeowners": ["@sirmeili"],
+  "codeowners": [
+    "@sirmeili"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/sirmeili/rnet-bridge",
@@ -9,6 +11,8 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/sirmeili/rnet-bridge/issues",
   "requirements": [],
-  "version": "0.1.0",
-  "zeroconf": ["_rnetbridge._tcp.local."]
+  "version": "0.1.1",
+  "zeroconf": [
+    "_rnetbridge._tcp.local."
+  ]
 }

@@ -1,71 +1,59 @@
 # Progress
 
 ## Done
-- M1 codec merged (PR #2); enclosure merged (PR #3); board switch to ESP32-POE-ISO merged (PR #4).
-- 2026-11-01: Windows dev machine set up. `pio test -e native` passes; `pio run -e esp32` succeeds.
-- 2026-11-02: M0 and M2 merged (PR #5). Every SPEC §11 bring-up question (items 1–10) answered on the CAA6.6;
-  results in `docs/rnet-notes.md`. `kSessionStartEvent = kNone`, `kSendDataAck = false`, and All Zones On is
-  disabled by default.
+- M1 codec (PR #2); enclosure (PR #3, then the lit button and status LED in PR #9); board switch to the
+  ESP32-POE-ISO (PR #4).
+- 2026-11-01: Windows dev machine set up.
+- 2026-11-02: M0 + M2 (PR #5). SPEC §11 items 1–10 answered on the CAA6.6 (`docs/rnet-notes.md`).
+- 2026-11-02: M3 engine (PR #6), verified on hardware.
+- 2026-11-03: M4 network (PR #7), verified on hardware. Known issues: Ethernet drops while the forced portal's AP
+  runs; WiFiManager blocks ~0.5 s at portal start.
+- 2026-11-03: M5 integration skeleton (PR #8) and M6 entities and options flow (PR #10).
+- 2026-11-04: M7 polish (PR #11). **v0.1.0 released**: firmware.bin, firmware-factory.bin, rnet_bridge.zip. The
+  human flashed it over OTA and installed the integration through HACS on the real HA.
 
 ## In progress
-- `feat/m7-polish-release` (M7, SPEC §9):
-  - Done: diagnostics (token redacted), `rnet_bridge.send_raw` service (registered in `async_setup`), reauth
-    flow (setup and reconnect), proto-mismatch repair issue (raised at setup or reconnect, cleared on
-    success), translations and icons for all of it, README with HACS install steps and the My Home Assistant
-    badge, `release.yml` (tag == manifest == firmware version; attaches `firmware.bin`, `firmware-factory.bin`,
-    `rnet_bridge.zip`), firmware version 0.1.0.
-  - Checks: native 134/134, ESP32 build OK, pytest 52/52 on HA 2026.10.4 and 2026.3.1, ruff and mypy clean.
-  - Waiting on the human: brand icons (keep the placeholder speaker or supply one), then merge, then publish
-    release `v0.1.0`, flash 0.1.0 to the bridge, and install through HACS on the real HA.
-
-## Done before
-- `feat/m6-entities` (M6), merged as PR #10: all entities, options flow, stale device cleanup, 44 tests.
-- `feat/m5-integration-skeleton` (M5), merged as PR #8: client, coordinator, config flow, HACS files, fake
-  bridge, 31 tests on HA 2026.10 and 2026.3.
-- `feat/m4-network` (M4, SPEC §9), merged as PR #7:
-  - Done: `docs/protocol.md` (proto 1 contract); engine raw sends and frame tap; `lib/bridge` (network policy,
-    double reset, API JSON); `src/net` (Ethernet, Wi-Fi fallback, portal, API server, mDNS, OTA, settings, log);
-    `tools/rnet_cli.py`. Firmware 0.0.3 on min_spiffs partitions.
-  - Checks so far: `pio test -e native` 133/133; `pio run -e esp32` (53% flash, 17% RAM) and `-e esp32-console`
-    succeed with no warnings; `rnet_cli.py` passes ruff and `mypy --strict`.
-  - **Hardware tests passed (2026-11-03)**, recorded in `docs/rnet-notes.md` ("M4 network check"): Ethernet/PoE,
-    mDNS, HTTP, WebSocket commands, keypad push, tracing and logs, OTA, portal → Wi-Fi, Ethernet return, double
-    reset, factory reset. Fixes made along the way: portal on channel 6, API paused before the portal, saved-Wi-Fi
-    detection, factory reset erasing Wi-Fi, a thread-safe log, and Wi-Fi modem sleep off.
-  - Known issues: Ethernet drops while the forced portal's AP runs; WiFiManager blocks about 0.5 s at portal start.
-  - Not hardware-tested: API token and OTA password (none were set).
-  - Board state: factory reset (no Wi-Fi saved, default settings), on Ethernet at 10.0.0.165.
-  - Next: PR review and merge by the human.
+- `fix/turn-on-volume-keeps-volume`, for release v0.1.1. The CAA6.6 sets a playing zone's volume to a new turn-on
+  volume; the engine now restores the volume in the next frame. Verified on hardware: zone 1 stayed at 34, and the
+  human heard no change with music playing. Versions bumped to 0.1.1. Next: PR, merge, release v0.1.1, then OTA
+  the bridge.
 
 ## Next
-- M5 integration skeleton. It can proceed without hardware using `fake_bridge.py`.
+- M8 hardening (SPEC §9): 48 h soak; Ethernet/Wi-Fi drop and controller power-cycle recovery; HA restart; OTA
+  from the HA host. Also test the API token and OTA password on hardware (never set so far).
+- Firmware for the enclosure's WS2812 status LED: confirm wiring and voltage first. Not in SPEC yet; ask the
+  human when to schedule it.
 
 ## Decisions
-- 2026-11-01: Run integration tests in Docker on this Windows machine. Home Assistant imports `fcntl`, so
-  `pytest-homeassistant-custom-component` cannot load on native Windows. Python 3.14 is required.
-- 2026-11-01: Install PlatformIO 6.2.0 to match the pin in `ci.yml`.
-- 2026-11-02: The hardware is an Olimex ESP32-POE-ISO + MOD-RS232 on the UEXT connector, and the network is Ethernet
-  with Wi-Fi fallback (both human decisions). UART1 on GPIO4 TX / GPIO36 RX, verified against the Rev O schematic.
-  A male-to-male null-modem cable is required (SPEC §2.3).
-- 2026-11-02 (human): keep the M2 console as a separate `esp32-console` build env, for other controller models and
-  later rechecks.
-- 2026-11-02 (human): a command's result is `ok` once its frame is sent; the follow-up poll confirms it (SPEC §4.3).
-- 2026-11-02 (human): a volume step while muted steps from the stored volume and unmutes (SPEC §4.3).
-- 2026-11-03 (human): the SPEC §4.4 fallback rules as written; Arduino core stays 2.0.17; `/api/info` gains
-  `network`, with `wifi_rssi` null on Ethernet. `aiohttp` approved for `tools/`.
-
-## Dev environment (Windows)
-- PlatformIO: `uv tool install platformio==6.2.0` (on PATH as `pio`).
-- Host compiler for native tests: WinLibs g++ via winget. It's on the user PATH, so open a new terminal after installing.
-- ruff and mypy: `.venv` (Python 3.14, gitignored). Its `pytest` does not work; see Decisions.
-- pytest, in Docker. Volumes: `rnet-bridge-venv` (current HA, image `python:3.14-slim` or `python:3.14`) and
-  `rnet-bridge-venv-min` (HA 2026.3.1, image `python:3.14`, which has a compiler). From the repo root in Git Bash:
-  ```bash
-  MSYS_NO_PATHCONV=1 docker run --rm -v rnet-bridge-venv:/venv -v "$(pwd -W):/src" -w /src python:3.14-slim /venv/bin/pytest tests/
-  ```
-  Swap the volume name to run on the 2026.3 minimum.
-- OpenSCAD 2021.01: `C:\Program Files\OpenSCAD\openscad.exe`, not on PATH.
-- The board shows up as COM4 (CH340) on this PC.
+- 2026-11-01: Integration tests run in Docker on this Windows machine (HA imports `fcntl`). PlatformIO 6.2.0, to
+  match `ci.yml`.
+- 2026-11-02 (human): hardware is an Olimex ESP32-POE-ISO + MOD-RS232 on UEXT; network is Ethernet with Wi-Fi
+  fallback. UART1 GPIO4 TX / GPIO36 RX; a male-to-male null-modem cable.
+- 2026-11-02 (human): keep the M2 console as the `esp32-console` build env.
+- 2026-11-02 (human): a command's result is `ok` once sent, and the poll confirms it. A volume step while muted
+  steps from the stored volume and unmutes. All Zones On is disabled by default. No data ACKs and no session
+  start (verified).
+- 2026-11-03 (human): the SPEC §4.4 fallback rules; Arduino core stays 2.0.17; `/api/info` gains `network`.
+  `aiohttp` approved for `tools/`.
+- 2026-11-03: HA compatibility from 2026.3 to current (`probatio`/`voluptuous`, `via_device_id`/`via_device`,
+  `suggested_area` only before 2026.9). CI tests both ends. Details in SPEC §5.
+- 2026-11-04 (human): keep the placeholder speaker brand icon for now.
+- 2026-11-04 (human): fix the turn-on volume side effect with option A (restore the volume right after) rather
+  than B (defer until the zone is off). The restore was inaudible.
 
 ## Open questions
 - Board revision printed on the PCB: not yet recorded in `docs/rnet-notes.md`.
+
+## Dev environment (Windows)
+- PlatformIO: `uv tool install platformio==6.2.0` (on PATH as `pio`).
+- Host compiler for native tests: WinLibs g++ via winget. It's on the user PATH; open a new terminal after
+  installing.
+- ruff and mypy: `.venv` (Python 3.14, gitignored). Its `pytest` does not work (see Decisions).
+- pytest, in Docker. Volumes: `rnet-bridge-venv` (current HA) and `rnet-bridge-venv-min` (HA 2026.3.1). Use image
+  `python:3.14`, which has a compiler. From the repo root in Git Bash:
+  ```bash
+  MSYS_NO_PATHCONV=1 docker run --rm -v rnet-bridge-venv:/venv -v "$(pwd -W):/src" -w /src python:3.14 /venv/bin/pytest tests/
+  ```
+- OpenSCAD 2021.01: `C:\Program Files\OpenSCAD\openscad.exe`, not on PATH.
+- The board's USB serial port has been COM4 and COM5 on this PC (CH340); check `pio device list`.
+- The bridge is on Ethernet at 10.0.0.165 (`rnet-bridge-083b.local`).
