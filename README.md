@@ -19,7 +19,7 @@ For each zone you enable:
 |---|---|
 | Media player (named after the zone) | Power, volume (one step = 2 on the keypad), mute, source selection |
 | Bass, Treble, Balance | −10 … +10 sliders |
-| Turn-on volume | 0–100 %, as the keypad shows it |
+| Turn-on volume | 0–100 %, as the keypad shows it. Changing it doesn't change what's playing now |
 | Loudness | On/off switch |
 
 On the controller device: **All zones off**, **Resync**, an **RNET link** sensor, and diagnostic counters
@@ -53,11 +53,15 @@ pip install esptool
 esptool.py --chip esp32 --port COM4 write_flash 0x0 firmware-factory.bin   # your serial port here
 ```
 
-Later updates can go over the network with the release's `firmware.bin`:
+Later updates can go over the network with the release's `firmware.bin`. Run this from the folder that holds
+the file; it prints `{"ok":true}` and the bridge restarts by itself:
 
 ```bash
 curl -F "firmware=@firmware.bin" http://rnet-bridge-xxxx.local/api/ota
 ```
+
+On Windows PowerShell, type `curl.exe`, not `curl`: plain `curl` is PowerShell's `Invoke-WebRequest`, which rejects
+`-F`.
 
 Always use the **firmware and integration from the same release**. Their API version must match, and Home
 Assistant shows a repair notice if it doesn't.

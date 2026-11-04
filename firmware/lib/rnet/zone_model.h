@@ -49,6 +49,11 @@ class ZoneModel {
   bool step_volume(uint8_t zone, int delta, uint8_t& volume);
   // Records a Set Volume sent by the engine, as the base for the next step.
   void note_commanded_volume(uint8_t zone, uint8_t volume);
+  // The zone's current volume: the last commanded one until a poll confirms it, else the
+  // reported one. `zone` must be 1..kNumZones.
+  uint8_t current_volume(uint8_t zone) const {
+    return commanded_valid_[zone - 1] ? commanded_volume_[zone - 1] : zones_[zone - 1].volume;
+  }
 
   // Bit (zone - 1) is set when that zone's state changed since the last take_changed().
   uint8_t take_changed();

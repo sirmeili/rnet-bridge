@@ -38,6 +38,10 @@ struct EngineConfig {
   uint8_t data_handshake_type = 0x02;
   SessionStartEvent session_start = SessionStartEvent::kNone;
   PowerSourceZone power_source_zone = PowerSourceZone::kZero;
+  // The CAA6.6 sets a playing zone's volume to its new turn-on volume (docs/rnet-notes.md).
+  // When on, a turn-on volume change on a zone that is on is followed straight away by a Set
+  // Volume back to the zone's current volume.
+  bool restore_volume_after_turn_on_volume = true;
 };
 
 enum class CommandType : uint8_t {
@@ -188,6 +192,9 @@ class Engine {
     WireFrame frame;
   };
   RawSlot raw_[kRawSlots] = {};
+  // Zones whose volume must be put back after a turn-on volume change (sent before polls).
+  bool restore_due_[kNumZones] = {};
+  uint8_t restore_volume_[kNumZones] = {};
   bool raw_sent_ = false;
   uint32_t raw_sent_ms_ = 0;
   FrameTap tap_ = nullptr;

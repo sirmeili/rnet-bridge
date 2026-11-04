@@ -82,6 +82,7 @@ class FakeController : public rnet::ByteIo {
   bool responsive = true;
   uint8_t volume[rnet::kNumZones] = {30, 23, 24, 36, 33, 15};
   uint8_t turn_on_volume[rnet::kNumZones] = {35, 20, 20, 20, 20, 20};
+  bool power[rnet::kNumZones] = {true, true, true, true, true, true};
   uint32_t now_ms = 0;
 
   int read() override {
@@ -135,7 +136,7 @@ class FakeController : public rnet::ByteIo {
   void respond(const Frame& f) {
     const uint8_t zz = f.source.zone;
     if (f.type == kRequest && f.body_len >= 5 && f.body[0] == 0x04 && f.body[4] == 0x07) {
-      inject(zone_info_reply(static_cast<uint8_t>(zz + 1), true, 2, volume[zz]));
+      inject(zone_info_reply(static_cast<uint8_t>(zz + 1), power[zz], 2, volume[zz]));
     } else if (f.type == kRequest && f.body_len >= 6 && f.body[0] == 0x05 && f.body[5] == 0x04) {
       inject(turn_on_volume_reply(static_cast<uint8_t>(zz + 1), turn_on_volume[zz]));
     } else if (f.type == kSetData) {
@@ -697,6 +698,81 @@ void test_frame_tap_sees_both_directions() {
   TEST_ASSERT_TRUE(log.rx > 0);
 }
 
+
+// --- Turn-on volume keeps the live volume (CAA6.6, docs/rnet-notes.md) ---
+
+size_t find_sent(const FakeController& io, const WireFrame& w, size_t from = 0) {
+  for (size_t i = from; i < io.count(); ++i) {
+    if (same_wire(io.sent(i), w)) {
+      return i;
+    }
+  }
+  return io.count();
+}
+
+void test_turn_on_volume_change_restores_volume_of_a_playing_zone() {
+  Rig r;
+  r.bring_up();
+  const size_t before = r.io.count();
+  r.submit(CommandType::kSetParam, 1, 40, ZoneParam::kTurnOnVolume);
+  r.run_for(300);
+  WireFrame tov{};
+  WireFrame vol{};
+  TEST_ASSERT_TRUE(rnet::build_set_zone_param(1, ZoneParam::kTurnOnVolume, 40, tov));
+  TEST_ASSERT_TRUE(rnet::build_set_volume(1, 30, vol));  // zone 1's volume before
+  const size_t i = find_sent(r.io, tov, before);
+  TEST_ASSERT_TRUE_MESSAGE(i < r.io.count(), "turn-on volume not sent");
+  TEST_ASSERT_TRUE_MESSAGE(i + 1 < r.io.count(), "nothing sent after it");
+  TEST_ASSERT_TRUE_MESSAGE(same_wire(r.io.sent(i + 1), vol), "restore is not the next frame");
+  const uint32_t gap = r.io.sent(i + 1).at_ms - r.io.sent(i).at_ms;
+  TEST_ASSERT_TRUE(gap >= 50 && gap <= 60);
+  TEST_ASSERT_EQUAL(CommandError::kNone, r.result().error);  // one result, for the command
+  CommandResult extra{};
+  TEST_ASSERT_FALSE(r.engine.next_result(extra));
+}
+
+void test_turn_on_volume_change_on_an_off_zone_sends_no_volume() {
+  Rig r;
+  r.io.power[1] = false;
+  r.bring_up();
+  const size_t before = r.io.count();
+  r.submit(CommandType::kSetParam, 2, 40, ZoneParam::kTurnOnVolume);
+  r.run_for(300);
+  for (size_t i = before; i < r.io.count(); ++i) {
+    const Frame& f = r.io.sent(i).frame;
+    TEST_ASSERT_FALSE_MESSAGE(f.type == kEvent && f.body_len >= 6 && f.body[4] == 0xDE,
+                              "Set Volume sent for an off zone");
+  }
+}
+
+void test_turn_on_volume_restore_uses_the_commanded_volume() {
+  Rig r;
+  r.bring_up();
+  r.submit(CommandType::kSetVolume, 1, 12, ZoneParam::kBass, 1);
+  r.submit(CommandType::kSetParam, 1, 40, ZoneParam::kTurnOnVolume, 2);
+  r.run_for(250);  // restores go ahead of polls, so this still uses the commanded 12
+  WireFrame vol{};
+  TEST_ASSERT_TRUE(rnet::build_set_volume(1, 12, vol));
+  size_t count = 0;
+  for (size_t i = 0; i < r.io.count(); ++i) {
+    count += same_wire(r.io.sent(i), vol) ? 1 : 0;
+  }
+  TEST_ASSERT_EQUAL_size_t(2, count);  // the command, then the restore
+}
+
+void test_turn_on_volume_restore_can_be_turned_off() {
+  EngineConfig cfg;
+  cfg.restore_volume_after_turn_on_volume = false;
+  Rig r(cfg);
+  r.bring_up();
+  const size_t before = r.io.count();
+  r.submit(CommandType::kSetParam, 1, 40, ZoneParam::kTurnOnVolume);
+  r.run_for(300);
+  WireFrame vol{};
+  TEST_ASSERT_TRUE(rnet::build_set_volume(1, 30, vol));
+  TEST_ASSERT_EQUAL_size_t(r.io.count(), find_sent(r.io, vol, before));
+}
+
 }  // namespace
 
 int main() {
@@ -734,5 +810,9 @@ int main() {
   RUN_TEST(test_raw_frame_with_link_down_fails);
   RUN_TEST(test_reply_to_a_raw_request_is_not_a_duplicate);
   RUN_TEST(test_frame_tap_sees_both_directions);
+  RUN_TEST(test_turn_on_volume_change_restores_volume_of_a_playing_zone);
+  RUN_TEST(test_turn_on_volume_change_on_an_off_zone_sends_no_volume);
+  RUN_TEST(test_turn_on_volume_restore_uses_the_commanded_volume);
+  RUN_TEST(test_turn_on_volume_restore_can_be_turned_off);
   return UNITY_END();
 }

@@ -322,3 +322,21 @@ Firmware 0.0.3 (`esp32` env), board on a PoE switch port plus USB, CAA6.6 connec
 
 **Not tested on hardware:** API token auth (WebSocket `auth`, `Bearer` on factory reset) and an OTA password. Both are
 set through the portal, and none was set. The JSON side is native-tested.
+
+## Turn-on volume moves a playing zone's volume (2026-11-04)
+On the CAA6.6, **changing a zone's turn-on volume while the zone is on also sets its current volume to the new
+value.** Traced with `rnet_cli.py frames`: the bridge sent only the Set Data, with no Set Volume, and the
+controller's next all-zone-info already showed the new volume. Both forms do it:
+
+| Form (PDF) | Frame for zone 1 | Result |
+|---|---|---|
+| §8.8.2 Set Data (`00`), value 30 | `F0 00 00 7F 00 00 70 00 05 02 00 00 00 04 00 00 00 01 00 01 00 1E 20 F7` | turn-on 30, **volume 30** |
+| §8.8.1 Event (`05`), Plus `69` | `F0 00 00 7F 00 00 70 05 05 02 00 00 00 04 00 69 00 00 00 05 00 01 74 F7` | turn-on +1, **volume +1** |
+
+The Event form also makes the controller send the bridge a keypad display message (type `06`); the Set Data
+doesn't. For a zone that is off, only the reported volume follows (see the M3 check).
+
+**Workaround (firmware, `EngineConfig::restore_volume_after_turn_on_volume`, on by default):** after a turn-on
+volume change on a zone that is on, the engine sends a Set Volume back to the zone's current volume as the next
+frame, about 50 ms later. On hardware, zone 1 stayed at volume 34 while its turn-on volume went 18 → 30 → 27 → 18;
+the reported volume never showed the change. Whether the 50 ms change is audible is up to the human to judge.
