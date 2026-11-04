@@ -61,6 +61,16 @@
           "6_enabled": "Source 6",
           "6_name": "Source 6 name"
         }
+      },
+      "reauth_confirm": {
+        "title": "Update the API token",
+        "description": "The RNET Bridge at {host} rejected the API token. Enter the token set in the bridge's setup portal, or leave it empty if the token was removed.",
+        "data": {
+          "token": "API token"
+        },
+        "data_description": {
+          "token": "Set in the bridge's setup portal (double-press the reset button to open it)."
+        }
       }
     },
     "error": {
@@ -72,7 +82,9 @@
     "abort": {
       "already_configured": "Device is already configured",
       "invalid_discovery": "The discovered device did not identify itself as an RNET Bridge.",
-      "unsupported_proto": "The bridge firmware speaks a different API version. Update the bridge firmware or this integration."
+      "unsupported_proto": "The bridge firmware speaks a different API version. Update the bridge firmware or this integration.",
+      "reauth_successful": "Re-authentication was successful",
+      "wrong_bridge": "That address answers as a different RNET Bridge than the one being updated."
     }
   },
   "exceptions": {
@@ -80,7 +92,7 @@
       "message": "Could not connect to the RNET Bridge at {host}."
     },
     "invalid_auth": {
-      "message": "The RNET Bridge rejected the API token. Remove and re-add the bridge with the right token."
+      "message": "The RNET Bridge rejected the API token."
     },
     "unsupported_proto": {
       "message": "The RNET Bridge speaks API version {proto}, but this integration supports version {supported}. Update the bridge firmware or this integration."
@@ -105,6 +117,12 @@
     },
     "unknown_source": {
       "message": "{source} is not an enabled source. Enable it in the integration options."
+    },
+    "entry_not_found": {
+      "message": "No RNET Bridge with config entry ID {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "{title} is not loaded."
     }
   },
   "options": {
@@ -192,6 +210,32 @@
     "switch": {
       "loudness": {
         "name": "Loudness"
+      }
+    }
+  },
+  "issues": {
+    "unsupported_proto": {
+      "title": "RNET Bridge firmware and integration don't match",
+      "description": "{title} speaks API version {proto}, but this integration supports version {supported}. Update the bridge firmware and the integration to the same release: each GitHub release ships both, with matching versions."
+    }
+  },
+  "services": {
+    "send_raw": {
+      "name": "Send raw RNET frame",
+      "description": "Debug tool: sends raw bytes to the controller through the bridge. Use with care.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Bridge",
+          "description": "The RNET Bridge to send through."
+        },
+        "hex": {
+          "name": "Hex bytes",
+          "description": "Bytes as hex, for example F0 00 00 7F ... F7."
+        },
+        "fix_checksum": {
+          "name": "Append checksum",
+          "description": "The hex runs from F0 to the last body byte; the bridge appends the checksum and F7."
+        }
       }
     }
   }

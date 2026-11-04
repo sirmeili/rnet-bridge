@@ -1,0 +1,16 @@
+send_raw:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: rnet_bridge
+    hex:
+      required: true
+      example: "F0 00 00 7F 00 00 70 01 04 02 00 00 07 00 00"
+      selector:
+        text:
+    fix_checksum:
+      default: false
+      selector:
+        boolean:

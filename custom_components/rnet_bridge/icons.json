@@ -44,5 +44,10 @@
         }
       }
     }
+  },
+  "services": {
+    "send_raw": {
+      "service": "mdi:console"
+    }
   }
 }

@@ -571,6 +571,10 @@ store later. Requirements (per hacs.xyz "Publish → Integration"; re-check the 
 - **Release automation:** `.github/workflows/release.yml`, on a published release: verify tag == manifest version,
   build firmware, attach `firmware.bin` and `rnet_bridge.zip` (zip of the integration folder).
   Optionally set `"zip_release": true` + `"filename": "rnet_bridge.zip"` in `hacs.json` later.
+  **Additions (M7, 2026-11-03):** the workflow also checks that the firmware version (`config.h`
+  `kFirmwareVersion`) equals the manifest version, so firmware and integration stay matched. It also attaches
+  `firmware-factory.bin`, a merged bootloader + partitions + app image for the first USB flash
+  (`esptool.py write_flash 0x0`). `firmware.bin` alone only suits OTA updates.
 - Because the integration has no PyPI dependency (`requirements: []`), nothing outside this repo needs publishing.
 
 ### 5.7 Quality bar

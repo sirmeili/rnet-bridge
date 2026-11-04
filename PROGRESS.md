@@ -8,17 +8,18 @@
   disabled by default.
 
 ## In progress
-- `feat/m6-entities` (M6, SPEC §9):
-  - Done: `entity.py` (controller/zone bases, availability rules), media_player, number (bass, treble,
-    balance, turn-on volume as %), switch (loudness), button (All On disabled by default, All Off, Resync),
-    binary_sensor (RNET link), sensor (counters, disabled by default), options flow (zones and sources, reload),
-    stale zone-device cleanup, entity translations and `icons.json`.
-  - HA compatibility handled: `via_device` vs `via_device_id`, `suggested_area` deprecated from 2026.9,
-    platform enums imported from the package (2026.3 has no `binary_sensor.const`).
-  - Checks: pytest 44/44 on HA 2026.10.4 and 2026.3.1 with no deprecation warnings; ruff and mypy clean.
-  - Next: push, CI/HACS/hassfest, PR.
+- `feat/m7-polish-release` (M7, SPEC §9):
+  - Done: diagnostics (token redacted), `rnet_bridge.send_raw` service (registered in `async_setup`), reauth
+    flow (setup and reconnect), proto-mismatch repair issue (raised at setup or reconnect, cleared on
+    success), translations and icons for all of it, README with HACS install steps and the My Home Assistant
+    badge, `release.yml` (tag == manifest == firmware version; attaches `firmware.bin`, `firmware-factory.bin`,
+    `rnet_bridge.zip`), firmware version 0.1.0.
+  - Checks: native 134/134, ESP32 build OK, pytest 52/52 on HA 2026.10.4 and 2026.3.1, ruff and mypy clean.
+  - Waiting on the human: brand icons (keep the placeholder speaker or supply one), then merge, then publish
+    release `v0.1.0`, flash 0.1.0 to the bridge, and install through HACS on the real HA.
 
 ## Done before
+- `feat/m6-entities` (M6), merged as PR #10: all entities, options flow, stale device cleanup, 44 tests.
 - `feat/m5-integration-skeleton` (M5), merged as PR #8: client, coordinator, config flow, HACS files, fake
   bridge, 31 tests on HA 2026.10 and 2026.3.
 - `feat/m4-network` (M4, SPEC §9), merged as PR #7:

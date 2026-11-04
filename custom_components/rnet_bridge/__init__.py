@@ -5,9 +5,14 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryError,
+    ConfigEntryNotReady,
+)
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.typing import ConfigType
 
 from .api import (
     RnetBridgeAuthError,
@@ -24,8 +29,13 @@ from .const import (
     NUM_ZONES,
     SUPPORTED_PROTO,
 )
-from .coordinator import RnetBridgeCoordinator
+from .coordinator import (
+    RnetBridgeCoordinator,
+    async_create_proto_issue,
+    async_delete_proto_issue,
+)
 from .entity import controller_identifier, zone_enabled, zone_identifier
+from .services import async_setup_services
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -36,7 +46,15 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
 ]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 type RnetConfigEntry = ConfigEntry[RnetBridgeCoordinator]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the services once (not per entry)."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool:
@@ -56,12 +74,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool
             translation_placeholders={"host": host},
         ) from err
     except RnetBridgeAuthError as err:
-        # Reauth arrives in M7; until then the user re-adds the bridge.
-        raise ConfigEntryError(
+        # Starts the reauth flow (config_flow.async_step_reauth).
+        raise ConfigEntryAuthFailed(
             translation_domain=DOMAIN, translation_key="invalid_auth"
         ) from err
     except RnetBridgeProtocolError as err:
-        # The repair issue for this arrives in M7 (SPEC §4.5).
+        # Firmware and integration must be updated together (SPEC §4.5).
+        async_create_proto_issue(hass, entry, err.proto)
         raise ConfigEntryError(
             translation_domain=DOMAIN,
             translation_key="unsupported_proto",
@@ -71,6 +90,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool
             },
         ) from err
 
+    async_delete_proto_issue(hass, entry)
     entry.runtime_data = coordinator
 
     controller = dr.async_get(hass).async_get_or_create(
