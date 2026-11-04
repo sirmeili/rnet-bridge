@@ -20,7 +20,8 @@
 
 ## Next
 - Option B for turn-on volume ("wait until the zone is off"), as a setting: plan in
-  `docs/plans/turn-on-volume-defer.md`. Waiting on two human decisions (default mode; integration vs firmware).
+  `docs/plans/turn-on-volume-defer.md`. Default mode decided (defer). **Blocked: where it runs (integration or
+  firmware) is undecided; ask the human before starting.**
 - M8 hardening (SPEC §9): 48 h soak; Ethernet/Wi-Fi drop and controller power-cycle recovery; HA restart; OTA
   from the HA host. Also test the API token and OTA password on hardware (never set so far).
 - Firmware for the enclosure's WS2812 status LED: confirm wiring and voltage first. Not in SPEC yet; ask the
@@ -42,8 +43,12 @@
 - 2026-11-04 (human): keep the placeholder speaker brand icon for now.
 - 2026-11-04 (human): fix the turn-on volume side effect with option A (restore the volume right after) rather
   than B (defer until the zone is off). The restore was inaudible.
+- 2026-11-04 (human): plan option B as a setting, alongside A. Its default mode will be "wait until the zone is
+  off". Where it runs is still open (see Open questions).
 
 ## Open questions
+- Option B: run the "wait until off" logic in the integration (recommended) or in the firmware? The human is
+  deciding; required before that work starts (`docs/plans/turn-on-volume-defer.md`).
 - Board revision printed on the PCB: not yet recorded in `docs/rnet-notes.md`.
 
 ## Dev environment (Windows)

@@ -1,6 +1,6 @@
 # Plan: "wait until the zone is off" for turn-on volume (option B)
 
-**Status:** planned, not implemented. Written 2026-11-04 at the human's request. Ships as an option alongside the
+**Status:** planned, not implemented. **Blocked on decision 2 (where it runs).** Written 2026-11-04 at the human's request. Ships as an option alongside the
 current behaviour.
 
 ## Problem
@@ -72,10 +72,11 @@ down" matters.
   shows pending; turn the zone off (from HA and from a keypad) → applied within one poll cycle (~3 s), and the
   keypad shows the new value.
 
-## Decisions for the human
-1. **Default for new and existing installs:** `defer` (no audible effect, but the controller and keypads show the
-   new value only after the zone turns off) or `restore` (today's behaviour). Recommendation: **`defer`**.
-2. **Where it runs:** integration (recommended) or firmware (works without HA running).
+## Decisions
+1. **Default mode: `defer` ("wait until the zone is off")**, for new and existing installs. Decided by the human,
+   2026-11-04.
+2. **Where it runs: OPEN.** Integration (recommended above) or firmware (works without HA running). The human
+   wants to think it over. **Settle this before starting work on this feature.**
 
 ## Estimate
 One release (v0.2.0, since a new option and an API field are added): firmware (small), protocol and fake bridge,
