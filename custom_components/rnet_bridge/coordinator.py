@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .api import (
@@ -22,10 +23,39 @@ from .api import (
     Snapshot,
     ZoneState,
 )
-from .const import DOMAIN, RECONNECT_MAX_S, RECONNECT_MIN_S
+from .const import DOMAIN, RECONNECT_MAX_S, RECONNECT_MIN_S, SUPPORTED_PROTO
 
 if TYPE_CHECKING:
     from . import RnetConfigEntry
+
+
+def _proto_issue_id(entry_id: str) -> str:
+    return f"unsupported_proto_{entry_id}"
+
+
+def async_create_proto_issue(
+    hass: HomeAssistant, entry: RnetConfigEntry, proto: int | None
+) -> None:
+    """Repair issue: firmware and integration speak different `proto` (SPEC §4.5)."""
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        _proto_issue_id(entry.entry_id),
+        is_fixable=False,
+        severity=ir.IssueSeverity.ERROR,
+        translation_key="unsupported_proto",
+        translation_placeholders={
+            "title": entry.title,
+            "proto": str(proto),
+            "supported": str(SUPPORTED_PROTO),
+        },
+    )
+
+
+def async_delete_proto_issue(hass: HomeAssistant, entry: RnetConfigEntry) -> None:
+    """Clear the proto repair issue once the bridge connects."""
+    ir.async_delete_issue(hass, DOMAIN, _proto_issue_id(entry.entry_id))
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,13 +146,19 @@ class RnetBridgeCoordinator(DataUpdateCoordinator[BridgeData]):
                     snapshot = await self.client.connect()
                 except RnetBridgeConnectionError as err:
                     _LOGGER.debug("Reconnect failed (retry in %.0f s): %s", delay, err)
-                except (RnetBridgeAuthError, RnetBridgeProtocolError) as err:
-                    # Needs the user (token or firmware/integration update). Keep
-                    # trying slowly; the repair issue and reauth arrive in M7.
+                except RnetBridgeAuthError as err:
+                    # The token changed on the bridge: ask the user (reauth flow).
+                    _LOGGER.error("RNET Bridge rejected the API token: %s", err)
+                    self.config_entry.async_start_reauth(self.hass)
+                    delay = RECONNECT_MAX_S
+                except RnetBridgeProtocolError as err:
+                    # Firmware and integration disagree on `proto`: repair issue.
                     _LOGGER.error("RNET Bridge refused the connection: %s", err)
+                    async_create_proto_issue(self.hass, self.config_entry, err.proto)
                     delay = RECONNECT_MAX_S
                 else:
                     _LOGGER.info("Reconnected to the RNET Bridge")
+                    async_delete_proto_issue(self.hass, self.config_entry)
                     self._apply_snapshot(snapshot)
                     delay = RECONNECT_MIN_S
                     break
@@ -151,6 +187,25 @@ class RnetBridgeCoordinator(DataUpdateCoordinator[BridgeData]):
                 translation_domain=DOMAIN,
                 translation_key="not_connected",
                 translation_placeholders={"command": cmd},
+            ) from err
+
+    async def async_send_raw(self, hex_bytes: str, fix_checksum: bool) -> None:
+        """Debug raw send (the send_raw service); translated errors like async_send."""
+        try:
+            await self.client.send_raw(hex_bytes, fix_checksum)
+        except RnetBridgeCommandError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key=f"command_{err.error}"
+                if err.error in ("busy", "invalid", "link_down", "timeout")
+                else "command_failed",
+                translation_placeholders={"command": "send_raw"},
+            ) from err
+        except RnetBridgeConnectionError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_connected",
+                translation_placeholders={"command": "send_raw"},
             ) from err
 
     async def async_shutdown(self) -> None:

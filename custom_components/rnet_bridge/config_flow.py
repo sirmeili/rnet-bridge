@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
 from typing import Any
 
@@ -25,11 +26,6 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
-try:  # Home Assistant 2026.9+ validates schemas with probatio (same API).
-    import probatio as vol
-except ImportError:  # 2026.3-2026.8 (hacs.json minimum)
-    import voluptuous as vol  # type: ignore[no-redef]
-
 from .api import (
     BridgeInfo,
     RnetBridgeAuthError,
@@ -37,6 +33,7 @@ from .api import (
     RnetBridgeConnectionError,
     RnetBridgeProtocolError,
 )
+from .compat import vol
 from .const import (
     CONF_ENABLED,
     CONF_SOURCES,
@@ -211,6 +208,41 @@ class RnetBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="zeroconf_confirm",
             data_schema=vol.Schema({vol.Optional(CONF_TOKEN): _TOKEN_SELECTOR}),
             description_placeholders={"host": self._host or "", "id": self.unique_id},
+            errors=errors,
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        """The bridge rejected the stored token (or now requires one)."""
+        self._host = entry_data[CONF_HOST]
+        self._port = entry_data.get(CONF_PORT, DEFAULT_PORT)
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask for the API token set in the bridge's setup portal."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._token = user_input.get(CONF_TOKEN) or None
+            errors = await self._async_try_connect()
+            if not errors:
+                assert self._info is not None
+                await self.async_set_unique_id(self._info.bridge_id)
+                self._abort_if_unique_id_mismatch(reason="wrong_bridge")
+                entry = self._get_reauth_entry()
+                data = {**entry.data}
+                if self._token:
+                    data[CONF_TOKEN] = self._token
+                else:
+                    data.pop(CONF_TOKEN, None)
+                return self.async_update_reload_and_abort(entry, data=data)
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({vol.Optional(CONF_TOKEN): _TOKEN_SELECTOR}),
+            description_placeholders={"host": self._host or ""},
             errors=errors,
         )
 

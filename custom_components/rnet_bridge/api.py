@@ -307,16 +307,31 @@ class RnetBridgeClient:
         RnetBridgeCommandError (including "timeout") or
         RnetBridgeConnectionError.
         """
+        message: dict[str, Any] = {"type": "command", "cmd": cmd}
+        if zone is not None:
+            message["zone"] = zone
+        if value is not None:
+            message["value"] = value
+        await self._request(message)
+
+    async def send_raw(self, hex_bytes: str, fix_checksum: bool = False) -> None:
+        """Debug: send raw RNET bytes (`raw_send`, docs/protocol.md).
+
+        With fix_checksum, `hex_bytes` runs from F0 to the last body byte and the
+        bridge appends the checksum and F7. Raises like send_command().
+        """
+        await self._request(
+            {"type": "raw_send", "hex": hex_bytes, "fix_checksum": fix_checksum}
+        )
+
+    async def _request(self, message: dict[str, Any]) -> None:
+        """Send a message that gets a `result`, and wait for it."""
         if not self.connected:
             raise RnetBridgeConnectionError("not connected")
         assert self._ws is not None
         msg_id = self._next_id
         self._next_id = (self._next_id % 0xFFFFFFFF) + 1
-        message: dict[str, Any] = {"type": "command", "id": msg_id, "cmd": cmd}
-        if zone is not None:
-            message["zone"] = zone
-        if value is not None:
-            message["value"] = value
+        message = {**message, "id": msg_id}
         fut: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         self._pending[msg_id] = fut
         try:

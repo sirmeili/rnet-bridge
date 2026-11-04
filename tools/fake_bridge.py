@@ -69,6 +69,7 @@ class FakeBridge:
         self.link_up = True
         self.zones = {z: FakeZone(zone=z) for z in range(1, NUM_ZONES + 1)}
         self.commands: list[dict[str, Any]] = []  # every command received, in order
+        self.raw_sent: list[bytes] = []  # every raw_send's bytes (checksum fixed)
         self._stored_volume: dict[int, int] = {}
         self._clients: set[web.WebSocketResponse] = set()
         self._runner: web.AppRunner | None = None
@@ -212,13 +213,16 @@ class FakeBridge:
         if kind in ("auth", "subscribe_logs", "trace_frames"):
             return
         if kind == "raw_send":
-            await ws.send_json({"type": "result", "id": data.get("id"), "ok": True})
+            await ws.send_json(self._result(data, self._raw(data)))
             return
         if kind != "command":
             await ws.send_json({"type": "error", "error": "bad_message"})
             return
         self.commands.append(data)
-        error = self._apply(data)
+        await ws.send_json(self._result(data, self._apply(data)))
+
+    @staticmethod
+    def _result(data: dict[str, Any], error: str | None) -> dict[str, Any]:
         result: dict[str, Any] = {
             "type": "result",
             "id": data.get("id"),
@@ -226,7 +230,27 @@ class FakeBridge:
         }
         if error is not None:
             result["error"] = error
-        await ws.send_json(result)
+        return result
+
+    def _raw(self, data: dict[str, Any]) -> str | None:
+        """Validate a raw_send like the firmware: hex bytes, at most 64 on the wire."""
+        if not isinstance(data.get("id"), int) or not isinstance(data.get("hex"), str):
+            return "invalid"
+        text = data["hex"].replace(",", " ").replace("0x", "").replace("0X", "")
+        try:
+            raw = bytes.fromhex(text)
+        except ValueError:
+            return "invalid"
+        fix = data.get("fix_checksum") is True
+        if not raw or len(raw) + (2 if fix else 0) > 64:
+            return "invalid"
+        if not self.link_up:
+            return "link_down"
+        if fix:
+            checksum = (sum(raw) + len(raw)) & 0x7F
+            raw = raw + bytes([checksum, 0xF7])
+        self.raw_sent.append(raw)
+        return None
 
     # --- simulated controller ---
 

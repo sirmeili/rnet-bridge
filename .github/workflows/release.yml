@@ -1,0 +1,68 @@
+name: Release
+
+# On a published GitHub Release: check that the tag matches the integration and
+# firmware versions, then attach the firmware and the zipped integration
+# (SPEC §5.6, CLAUDE.md golden rule 7). One repo version = matched firmware +
+# integration.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  assets:
+    name: Build and attach release assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check tag == manifest version == firmware version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          manifest=$(python3 -c "import json; print(json.load(open('custom_components/rnet_bridge/manifest.json'))['version'])")
+          firmware=$(sed -nE 's/.*kFirmwareVersion = "([^"]+)".*/\1/p' firmware/include/config.h)
+          echo "tag=$TAG manifest=$manifest firmware=$firmware"
+          if [ "$TAG" != "v$manifest" ]; then
+            echo "::error::Tag $TAG does not match manifest.json version $manifest (expected v$manifest)"
+            exit 1
+          fi
+          if [ "$firmware" != "$manifest" ]; then
+            echo "::error::Firmware version $firmware does not match manifest.json version $manifest"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: pip install platformio==6.2.0
+
+      - name: Build firmware
+        working-directory: firmware
+        run: pio run -e esp32
+
+      - name: Make the factory image (first flash over USB)
+        working-directory: firmware
+        run: |
+          B=.pio/build/esp32
+          BOOT_APP0=$(ls ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin)
+          pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32 merge_bin \
+            -o ../firmware-factory.bin \
+            --flash_mode keep --flash_freq keep --flash_size keep \
+            0x1000 $B/bootloader.bin 0x8000 $B/partitions.bin \
+            0xe000 "$BOOT_APP0" 0x10000 $B/firmware.bin
+          cp $B/firmware.bin ../firmware.bin
+
+      - name: Zip the integration
+        working-directory: custom_components/rnet_bridge
+        run: zip -r ../../rnet_bridge.zip . -x '__pycache__/*' '*.pyc'
+
+      - name: Attach assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" firmware.bin firmware-factory.bin rnet_bridge.zip --clobber
