@@ -240,7 +240,11 @@ void ApiServer::loop(uint32_t now_ms, uint8_t changed_zones, bool link_changed) 
   }
   if (now_ms - last_cleanup_ms_ >= kCleanupIntervalMs) {
     last_cleanup_ms_ = now_ms;
-    ws_.cleanupClients(kMaxClients);
+    // Only frees closed clients. With a limit, the library closes the *oldest* client when over it,
+    // which dropped long-lived clients when a Home Assistant restart briefly left a half-open
+    // socket next to the new one (M8 R1). The limit is ours: handle_event refuses a client when
+    // every slot is taken, and a stale client leaves after kClientTimeoutMs.
+    ws_.cleanupClients(UINT16_MAX);
   }
 }
 

@@ -353,13 +353,23 @@ Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each o
 
 | # | Test | Expected | Result |
 |---|---|---|---|
-| R1 | Controller power-cycle | RNET link sensor goes off, then on by itself; zones return to their states | _pending_ |
+| R1 | Controller power-cycle | RNET link sensor goes off, then on by itself; zones return to their states | Pass (2026-11-05): link down 16 s, back by itself; HA reconnected at once. Findings below |
 | R2 | Ethernet unplugged (Wi-Fi saved first through the portal) | Bridge falls back to Wi-Fi; HA follows the new address through zeroconf | _pending_ |
 | R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | _pending_ |
 | R4 | Home Assistant restart | Integration reconnects; entities return without user action | _pending_ |
 | R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | _pending_ |
 | R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | _pending_ |
 | R7 | OTA password set in the portal | `/api/ota` without it returns 401; with it, succeeds | _pending_ |
+
+R1 findings:
+- `duplicate_replies` +2 right after the link came back. These were late answers to requests that had been retried
+  while the controller booted, not retransmissions. Fixed in the engine: within one request timeout after a retried
+  request is answered or fails, identical replies of the same kind and zone are not counted.
+- The bridge closed a long-lived WebSocket client twice (00:48 and 00:51 UTC). Cause: `cleanupClients(4)` in
+  ESPAsyncWebServer closes the *oldest* client whenever more than 4 are open, and a Home Assistant restart briefly
+  leaves a half-open socket next to the new one. Fixed: the library now only frees closed clients; the bridge's own
+  4-slot limit refuses the newest client instead, and a stale one leaves after the 30 s ping timeout.
+- `dropped` +2 in the 10 min after the power-cycle (none in the 21 h before). Watching in the soak.
 
 ### Soak (48 h)
 Run on a Debian Docker host, from the repo root:
