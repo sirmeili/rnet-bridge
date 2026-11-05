@@ -70,6 +70,11 @@ void ApiServer::begin() {
   server_.begin();
 }
 
+void ApiServer::close_all() {
+  closing_ = true;
+  ws_.closeAll();
+}
+
 void ApiServer::set_paused(bool paused) {
   if (paused == paused_) {
     return;
@@ -259,7 +264,7 @@ void ApiServer::handle_event(const Event& e, uint32_t now_ms) {
           break;
         }
       }
-      if (slot == nullptr || paused_) {
+      if (slot == nullptr || paused_ || closing_) {
         ws_.close(e.client);
         return;
       }

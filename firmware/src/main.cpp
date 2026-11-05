@@ -51,6 +51,9 @@ void schedule_restart(uint32_t now_ms) {
     g_restart_pending = true;
     g_restart_at_ms = now_ms + kRestartDelayMs;
     LOG_WARN("restarting in %lu ms", static_cast<unsigned long>(kRestartDelayMs));
+    // Tell WebSocket clients now, while there is time for the close frames to go out; otherwise
+    // they only notice the reboot through their own timeouts (up to 75 s for Home Assistant).
+    g_api->close_all();
   }
 }
 

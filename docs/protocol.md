@@ -55,7 +55,8 @@ Every message is a JSON text frame with a `type`.
    `zone_state` and `link` messages as things change.
 
 The server pings every 15 s and drops a client that hasn't answered (pong or any message) for 30 s. At most 4
-clients are served at once; a 5th is closed straight after connecting.
+clients are served at once; a 5th is closed straight after connecting. About 1 s before any restart (OTA, factory
+reset, portal save) the bridge closes every client with a close frame and refuses new ones until it reboots.
 
 ### Server → client
 ```jsonc
