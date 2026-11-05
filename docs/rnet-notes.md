@@ -354,8 +354,8 @@ Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each o
 | # | Test | Expected | Result |
 |---|---|---|---|
 | R1 | Controller power-cycle | RNET link sensor goes off, then on by itself; zones return to their states | Pass (2026-11-05): link down 16 s, back by itself; HA reconnected at once. Findings below |
-| R2 | Ethernet unplugged (Wi-Fi saved first through the portal) | Bridge falls back to Wi-Fi; HA follows the new address through zeroconf | _pending_ |
-| R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | _pending_ |
+| R2 | Ethernet unplugged (Wi-Fi saved first through the portal) | Bridge falls back to Wi-Fi; HA follows the new address through zeroconf | Pass (2026-11-05), with notes below: on Wi-Fi at a new address, HA followed by itself |
+| R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | Pass (2026-11-05): no reboot; Wi-Fi off; HA unavailable 10 s, then back |
 | R4 | Home Assistant restart | Integration reconnects; entities return without user action | _pending_ |
 | R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | _pending_ |
 | R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | _pending_ |
@@ -374,6 +374,16 @@ R1 findings:
 - `dropped`: 5 between 00:53 and 02:04 UTC, none in the 21 h before. None caused a missed reply. Two came 30 s apart
   at 01:50, when a bathroom light was switched (not one HA records). Possibly electrical noise on the RS-232 cable.
   Watching in the soak.
+
+R2/R3 notes:
+- The board is powered by PoE: unplugging Ethernet without USB power connected cuts power. Run R2 with USB connected
+  (safe on the ISO board).
+- Double reset needs two quick presses of RST (about 1 s apart). Presses about 8 s apart only rebooted twice.
+- Wi-Fi signal at the bridge was weak (-83 dBm). HA's connection dropped 6 times in the first 4 minutes on Wi-Fi
+  ("connection closed by the bridge", HA the only client), then held for 48 minutes. One other client (the CLI log
+  stream from a PC) was closed once with nothing in the bridge's log. Wi-Fi is only the fallback; not pursued.
+- After a reboot, HA noticed only when its 75 s silence check fired (the old TCP connection was never closed).
+  Recovers by itself; a shorter check is a possible improvement.
 
 ### Soak (48 h)
 Run on a Debian Docker host, from the repo root:
