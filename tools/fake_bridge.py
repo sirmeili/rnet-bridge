@@ -61,6 +61,7 @@ class FakeBridge:
         bridge_id: str = "a1b2c3d4e5f6",
         token: str | None = None,
         proto: int = PROTO,
+        link_interval: float = LINK_INTERVAL_S,
     ) -> None:
         """Set up six zones; call start() to listen."""
         self.bridge_id = bridge_id
@@ -75,6 +76,26 @@ class FakeBridge:
         self._runner: web.AppRunner | None = None
         self._started = time.monotonic()
         self._tasks: set[asyncio.Task[None]] = set()
+        self.link_interval = link_interval
+        # Engine counters, as in `link`; rx/tx grow like the firmware's polling.
+        self.stats = {
+            k: 0
+            for k in (
+                "tx",
+                "rx",
+                "checksum_errors",
+                "dropped",
+                "timeouts",
+                "retries",
+                "duplicate_replies",
+                "handshakes_rx",
+                "queue_depth",
+            )
+        }
+        self.polling = True  # tests set False to simulate a stalled engine
+        # Last zone_state pushed per zone: zone_state goes out only on change
+        # (docs/protocol.md), like the firmware.
+        self._last_pushed: dict[int, dict[str, Any]] = {}
         self.port = 0
 
     # --- server ---
@@ -371,7 +392,12 @@ class FakeBridge:
     async def _link_ticker(self) -> None:
         """`link` every 30 s, like the firmware (clients use it as a liveness check)."""
         while True:
-            await asyncio.sleep(LINK_INTERVAL_S)
+            await asyncio.sleep(self.link_interval)
+            if self.polling and self.link_up:
+                # One zone polled every 500 ms: about 2 frames each way per second.
+                frames = max(1, int(2 * self.link_interval))
+                self.stats["tx"] += frames
+                self.stats["rx"] += frames
             await self._broadcast(self._link())
 
     def _zone_json(self, zone: int) -> dict[str, Any]:
@@ -381,20 +407,12 @@ class FakeBridge:
         return {
             "type": "link",
             "up": self.link_up,
-            "stats": {
-                "tx": 0,
-                "rx": 0,
-                "checksum_errors": 0,
-                "dropped": 0,
-                "timeouts": 0,
-                "retries": 0,
-                "duplicate_replies": 0,
-                "handshakes_rx": 0,
-                "queue_depth": 0,
-            },
+            "stats": dict(self.stats),
         }
 
     def _snapshot(self) -> dict[str, Any]:
+        for z in self.zones:  # what a client now knows; later pushes are changes
+            self._last_pushed[z] = self._zone_json(z)
         link = self._link()
         del link["type"]
         return {
@@ -404,7 +422,11 @@ class FakeBridge:
         }
 
     async def _broadcast_zone(self, zone: int) -> None:
-        await self._broadcast({"type": "zone_state", **self._zone_json(zone)})
+        state = self._zone_json(zone)
+        if self._last_pushed.get(zone) == state:
+            return  # unchanged: the firmware pushes zone_state only on change
+        self._last_pushed[zone] = state
+        await self._broadcast({"type": "zone_state", **state})
 
     async def _broadcast(self, message: dict[str, Any]) -> None:
         for ws in list(self._clients):

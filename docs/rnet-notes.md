@@ -344,3 +344,36 @@ steps; **a short blip is audible for extreme jumps** (e.g. playing at 35 raw wit
 Judged acceptable (2026-11-04). The README invites owners of other controllers that don't move the live volume to
 open an issue; a test build would turn the restore off (`restore_volume_after_turn_on_volume = false`) or use the
 Event form.
+
+## M8 hardening (in progress)
+Firmware 0.1.1. Procedure and results; recovery tests first, then the 48 h soak with nothing touched.
+
+### Recovery tests
+Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each one.
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| R1 | Controller power-cycle | RNET link sensor goes off, then on by itself; zones return to their states | _pending_ |
+| R2 | Ethernet unplugged (Wi-Fi saved first through the portal) | Bridge falls back to Wi-Fi; HA follows the new address through zeroconf | _pending_ |
+| R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | _pending_ |
+| R4 | Home Assistant restart | Integration reconnects; entities return without user action | _pending_ |
+| R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | _pending_ |
+| R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | _pending_ |
+| R7 | OTA password set in the portal | `/api/ota` without it returns 401; with it, succeeds | _pending_ |
+
+### Soak (48 h)
+Run on a Debian Docker host, from the repo root:
+```bash
+docker build -t rnet-soak -f tools/soak/Dockerfile tools
+sudo mkdir -p /srv/rnet-soak && sudo chown 10001 /srv/rnet-soak   # the container runs as uid 10001
+docker run -d --name rnet-soak --restart unless-stopped   -e BRIDGE_HOST=10.0.0.165 -v /srv/rnet-soak:/data rnet-soak
+docker logs -f rnet-soak            # live events
+cat /srv/rnet-soak/summary.json     # running pass/fail (rewritten every 10 min)
+docker stop rnet-soak               # at the end: writes the final summary
+```
+If an API token is set (R6), add `-e BRIDGE_TOKEN=...`. Pass criteria: SPEC §8 (soak test).
+
+Pre-check (2026-11-05, 95 s against the real bridge from this PC): all criteria passed. 6/6 liveness checks, no
+stalls, link up 100 %.
+
+Result: _pending_

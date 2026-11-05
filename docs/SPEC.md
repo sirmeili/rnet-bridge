@@ -633,6 +633,19 @@ entity translations, diagnostics, reauth if a token is added later, unavailable 
   reconnect after server drop, unavailable states.
 - **Hardware-in-the-loop** (manual, documented checklists in `docs/rnet-notes.md`): see milestones below.
 - **Soak test:** 48 h running with HA connected. Zero stuck states, zero firmware resets, stats reviewed.
+  **Measured by `tools/soak_monitor.py`** (Docker image in `tools/soak/`), which runs beside HA on a separate host.
+  Pass criteria (defined 2026-11-03, human-approved), all over the whole run:
+
+  | Criterion | Measured as |
+  |---|---|
+  | No bridge resets | `/api/info` `uptime_s` checked every 5 min; any drop counts as a reset |
+  | No duplicate replies | `duplicate_replies` in `link` stats never increases |
+  | RNET link up ≥ 99.9 % | Time with `link.up` true / time the monitor was connected |
+  | Every liveness check passes | Every 10 min a `refresh` command must be answered `ok` within 5 s |
+  | No polling stalls ("stuck") | While the link is up, `link` stats `rx` must grow between the periodic `link` messages (30 s) |
+  | No unplanned WebSocket disconnects | The monitor's connection never drops (don't run planned recovery tests during the soak) |
+
+  A run that restarts the monitor (e.g. a host reboot) continues the same totals and records the gap.
 
 ---
 

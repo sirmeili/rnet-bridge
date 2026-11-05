@@ -13,10 +13,14 @@
   human flashed it over OTA and installed the integration through HACS on the real HA.
 
 ## In progress
-- `fix/turn-on-volume-keeps-volume`, for release v0.1.1. The CAA6.6 sets a playing zone's volume to a new turn-on
-  volume; the engine now restores the volume in the next frame. Verified on hardware: zone 1 stayed at 34, and the
-  human heard no change with music playing. Versions bumped to 0.1.1. Next: PR, merge, release v0.1.1, then OTA
-  the bridge.
+- `feat/m8-hardening` (M8, SPEC §9):
+  - Done: `tools/soak_monitor.py` + `tools/soak/Dockerfile` (the human runs the 48 h soak on a Debian Docker host,
+    since this PC can't stay on); measurable soak pass criteria in SPEC §8 (human-approved); the fake bridge now
+    pushes zone_state only on change and grows its frame counters, like the firmware; the M8 procedure in
+    `docs/rnet-notes.md`. Pre-check against the real bridge: all criteria passed.
+  - Checks: pytest 57/57 on HA 2026.10.4 and 2026.3.1; ruff and mypy clean; Docker image builds (211 MB).
+  - Next: recovery tests R1–R7 with the human, then the 48 h soak, then results and the PR.
+- v0.1.1 released 2026-11-04 (turn-on volume restore); the bridge runs 0.1.1.
 
 ## Next
 - Option B for turn-on volume ("wait until the zone is off"), as a setting: plan in
@@ -28,6 +32,8 @@
   human when to schedule it.
 
 ## Decisions
+- 2026-11-04 (human): run the 48 h soak in Docker on a Debian x86 server on the bridge's subnet, built locally
+  (no published image). Soak pass criteria as in SPEC §8. OK to set an API token and OTA password for testing.
 - 2026-11-01: Integration tests run in Docker on this Windows machine (HA imports `fcntl`). PlatformIO 6.2.0, to
   match `ci.yml`.
 - 2026-11-02 (human): hardware is an Olimex ESP32-POE-ISO + MOD-RS232 on UEXT; network is Ethernet with Wi-Fi
