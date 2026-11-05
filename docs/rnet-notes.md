@@ -356,7 +356,7 @@ Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each o
 | R1 | Controller power-cycle | RNET link sensor goes off, then on by itself; zones return to their states | Pass (2026-11-05): link down 16 s, back by itself; HA reconnected at once. Findings below |
 | R2 | Ethernet unplugged (Wi-Fi saved first through the portal) | Bridge falls back to Wi-Fi; HA follows the new address through zeroconf | Pass (2026-11-05), with notes below: on Wi-Fi at a new address, HA followed by itself |
 | R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | Pass (2026-11-05): no reboot; Wi-Fi off; HA unavailable 10 s, then back |
-| R4 | Home Assistant restart | Integration reconnects; entities return without user action | _pending_ |
+| R4 | Home Assistant restart | Integration reconnects; entities return without user action | Pass (2026-11-05): entities back 26 s after HA started, states matched the bridge; the soak monitor's connection stayed up |
 | R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | _pending_ |
 | R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | _pending_ |
 | R7 | OTA password set in the portal | `/api/ota` without it returns 401; with it, succeeds | _pending_ |
