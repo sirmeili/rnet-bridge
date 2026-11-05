@@ -269,7 +269,16 @@ class SoakMonitor:
                         aiohttp.WSMsgType.ERROR,
                     ):
                         break
+                # A code such as 1000: the bridge sent a close frame (it closed us on
+                # purpose). 1006 or an exception: the TCP connection ended without one
+                # (the network, or a TCP timeout).
                 reason = "closed by the bridge"
+                code = self._ws.close_code
+                exc = self._ws.exception()
+                if code is not None:
+                    reason += f" (code {code})"
+                if exc is not None:
+                    reason += f" ({type(exc).__name__}: {exc})"
             except (aiohttp.ClientError, TimeoutError, RuntimeError, ValueError) as err:
                 reason = f"{type(err).__name__}: {err}"
             if self._connected:
