@@ -365,11 +365,15 @@ R1 findings:
 - `duplicate_replies` +2 right after the link came back. These were late answers to requests that had been retried
   while the controller booted, not retransmissions. Fixed in the engine: within one request timeout after a retried
   request is answered or fails, identical replies of the same kind and zone are not counted.
-- The bridge closed a long-lived WebSocket client twice (00:48 and 00:51 UTC). Cause: `cleanupClients(4)` in
-  ESPAsyncWebServer closes the *oldest* client whenever more than 4 are open, and a Home Assistant restart briefly
-  leaves a half-open socket next to the new one. Fixed: the library now only frees closed clients; the bridge's own
-  4-slot limit refuses the newest client instead, and a stale one leaves after the 30 s ping timeout.
-- `dropped` +2 in the 10 min after the power-cycle (none in the 21 h before). Watching in the soak.
+- The bridge closed a long-lived WebSocket client twice (00:48 and 00:51 UTC). Cause not confirmed. HA history
+  shows no restart then, and only HA and the recorder were connected. Ruled out: ESPAsyncWebServer's close-when-full
+  (off by default). Fixed anyway: `cleanupClients(4)` closed the *oldest* client when more than 4 were open, against
+  protocol.md (the 5th is refused); it now only frees closed clients. Remaining suspect: AsyncTCP's 5 s ACK timeout
+  (the recorder ran under Docker Desktop on Windows). The soak monitor now records the close code: a code means the
+  bridge closed it on purpose; 1006 means the TCP connection ended without a close frame.
+- `dropped`: 5 between 00:53 and 02:04 UTC, none in the 21 h before. None caused a missed reply. Two came 30 s apart
+  at 01:50, when a bathroom light was switched (not one HA records). Possibly electrical noise on the RS-232 cable.
+  Watching in the soak.
 
 ### Soak (48 h)
 Run on a Debian Docker host, from the repo root:
