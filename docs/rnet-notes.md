@@ -357,7 +357,7 @@ Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each o
 | R2 | Ethernet unplugged (Wi-Fi saved first through the portal) | Bridge falls back to Wi-Fi; HA follows the new address through zeroconf | Pass (2026-11-05), with notes below: on Wi-Fi at a new address, HA followed by itself |
 | R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | Pass (2026-11-05): no reboot; Wi-Fi off; HA unavailable 10 s, then back |
 | R4 | Home Assistant restart | Integration reconnects; entities return without user action | Pass (2026-11-05): entities back 26 s after HA started, states matched the bridge; the soak monitor's connection stayed up |
-| R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | Pass (2026-11-05), v0.1.1 release image: `{"ok":true}`, rebooted; HA noticed only after 61 s, then reconnected in 1 s. Fixed: clients are now closed before a restart |
+| R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | Pass (2026-11-05), v0.1.1 release image: `{"ok":true}`, rebooted; HA noticed only after 61 s, then reconnected in 1 s. Fixed: clients are now closed before a restart; verified with a second OTA: HA unavailable at the restart, back 8 s later |
 | R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | _pending_ |
 | R7 | OTA password set in the portal | `/api/ota` without it returns 401; with it, succeeds | _pending_ |
 
@@ -383,7 +383,7 @@ R2/R3 notes:
   ("connection closed by the bridge", HA the only client), then held for 48 minutes. One other client (the CLI log
   stream from a PC) was closed once with nothing in the bridge's log. Wi-Fi is only the fallback; not pursued.
 - After a reboot, HA noticed only when its 75 s silence check fired (the old TCP connection was never closed).
-  Recovers by itself; a shorter check is a possible improvement.
+  Fixed after R5: the bridge closes all clients when a restart is scheduled (see R5).
 
 ### Soak (48 h)
 Run on a Debian Docker host, from the repo root:
