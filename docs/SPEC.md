@@ -351,6 +351,9 @@ host with a scripted fake controller.
   fall back to Wi-Fi again. The device serves on one interface at a time.
 - Re-announce mDNS on every interface change. The address changes, and the integration follows it through
   zeroconf rediscovery (§5.3).
+- **No mDNS while the portal is open** (2026-11-05, M8). Saving Wi-Fi in the portal joins Wi-Fi to test it, and
+  the bridge was announced at its Wi-Fi address while serving on Ethernet; Home Assistant kept that address after
+  the restart. mDNS stops when the portal opens and is announced again when it closes (the API is paused anyway).
 - Captive portal: start an AP `RNET-Bridge-XXXX` (last 4 of MAC) when there is no Ethernet and either no saved
   Wi-Fi credentials or Wi-Fi fails to connect for 60 s. A board running on Ethernet with no Wi-Fi saved does not
   start the portal. Portal fields: Wi-Fi SSID/password, hostname (default `rnet-bridge-xxxx`), optional API token,
