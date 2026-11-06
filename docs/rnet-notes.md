@@ -385,13 +385,16 @@ R2/R3 notes:
 - After a reboot, HA noticed only when its 75 s silence check fired (the old TCP connection was never closed).
   Fixed after R5: the bridge closes all clients when a restart is scheduled (see R5).
 
-Stale address after the portal (found in R6, open):
+Stale address after the portal (found in R6, fixed):
 - With Ethernet connected, opening the portal (double reset) also brings up Wi-Fi, and the bridge announced itself
   over mDNS at its Wi-Fi address (10.0.0.151). HA's zeroconf updated the entry to it. After the portal save the
   bridge was back on Ethernet only (10.0.0.165) and announced that, but HA kept retrying 10.0.0.151 for 8+ minutes
   (setup_retry, backoff up to 320 s). The next reboot's announcement fixed it within 3 s.
-- Planned: the integration re-resolves the bridge over mDNS when it can't connect, plus a reconfigure step to set
-  the host by hand; the firmware stops announcing on Wi-Fi while Ethernet is serving.
+- Fixed in both. The firmware stops mDNS while the portal is open (0bcf38a). The integration looks the bridge up
+  over mDNS when the stored address fails, and has a reconfigure step (3c1ead6, not yet on the real HA).
+- Firmware fix verified 2026-11-05 with the old integration: double reset, Wi-Fi saved again in the portal. HA
+  stayed on 10.0.0.165 and reconnected without a reload; 10.0.0.151 never answered. A reset-button reboot can't
+  close connections, so HA noticed through its 75 s silence check (a shorter check is a possible improvement).
 
 ### Soak (48 h)
 Run on a Debian Docker host, from the repo root:

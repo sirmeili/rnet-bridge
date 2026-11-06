@@ -23,13 +23,12 @@
     WebSocket client when over 4; clients are closed before any restart (HA noticed a reboot after 61–75 s, now
     <1 s); no mDNS while the portal is open; the integration finds a moved bridge over mDNS and has a reconfigure
     step. The soak monitor records WebSocket close codes.
-  - On the bridge: firmware up to 8f0b4a1 (close-before-restart). **Not yet on hardware:** the mDNS-in-portal fix
-    (0bcf38a) and the integration change (3c1ead6, needs installing on the real HA).
+  - On the bridge: firmware 0bcf38a (all firmware fixes); the portal fix verified on hardware. The integration
+    change (3c1ead6) reaches the real HA with the next release (human's choice).
   - Checks: native 140/140; pytest 65/65 on current HA and 2026.3.1; ruff and mypy clean; firmware builds.
   - Bridge now has a test API token and OTA password set (values given by the human for testing; not stored in
     the repo). The soak monitor needs `-e BRIDGE_TOKEN=...`.
-  - Next: verify the two fixes on hardware (portal: HA keeps the Ethernet address), then the 48 h soak on the
-    Debian host, then results and the PR. Watch the dropped-frame rate (5 in ~75 min after the controller
+  - Next: the 48 h soak on the Debian host, then results and the PR. Watch the dropped-frame rate (5 in ~75 min after the controller
     power-cycle; likely line noise, no missed replies).
 - v0.1.1 released 2026-11-04 (turn-on volume restore); the bridge runs 0.1.1.
 
