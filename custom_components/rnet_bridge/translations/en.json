@@ -71,6 +71,18 @@
         "data_description": {
           "token": "Set in the bridge's setup portal (double-press the reset button to open it)."
         }
+      },
+      "reconfigure": {
+        "title": "Change the bridge address",
+        "description": "Enter the bridge's current address. Usually not needed: the address is updated automatically when the bridge moves between Ethernet and Wi-Fi.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "Hostname or IP address, for example rnet-bridge-1a2b.local.",
+          "port": "Leave at 80 unless you changed it."
+        }
       }
     },
     "error": {
@@ -84,7 +96,8 @@
       "invalid_discovery": "The discovered device did not identify itself as an RNET Bridge.",
       "unsupported_proto": "The bridge firmware speaks a different API version. Update the bridge firmware or this integration.",
       "reauth_successful": "Re-authentication was successful",
-      "wrong_bridge": "That address answers as a different RNET Bridge than the one being updated."
+      "wrong_bridge": "That address answers as a different RNET Bridge than the one being updated.",
+      "reconfigure_successful": "Re-configuration was successful"
     }
   },
   "exceptions": {

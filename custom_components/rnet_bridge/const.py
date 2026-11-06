@@ -29,6 +29,9 @@ LISTEN_TIMEOUT_S: Final = 75.0
 # Reconnect backoff (SPEC §5.2).
 RECONNECT_MIN_S: Final = 1.0
 RECONNECT_MAX_S: Final = 60.0
+# After this many failed reconnects in a row (and every as many after), look the
+# bridge up over mDNS in case its address changed and the rediscovery was missed.
+MOVED_CHECK_EVERY: Final = 3
 
 MANUFACTURER: Final = "Russound"
 CONTROLLER_NAME: Final = "Russound Controller"

@@ -246,6 +246,39 @@ class RnetBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change the bridge's address by hand, keeping the token, zones and sources."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._host = str(user_input[CONF_HOST]).strip()
+            self._port = int(user_input.get(CONF_PORT, DEFAULT_PORT))
+            self._token = entry.data.get(CONF_TOKEN)
+            errors = await self._async_try_connect()
+            if not errors:
+                assert self._info is not None
+                await self.async_set_unique_id(self._info.bridge_id)
+                self._abort_if_unique_id_mismatch(reason="wrong_bridge")
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_HOST: self._host, CONF_PORT: self._port}
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_HOST, default=self._host or entry.data[CONF_HOST]
+                ): TextSelector(),
+                vol.Optional(
+                    CONF_PORT, default=entry.data.get(CONF_PORT, DEFAULT_PORT)
+                ): _PORT_SELECTOR,
+            }
+        )
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=schema, errors=errors
+        )
+
     async def async_step_zones(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:

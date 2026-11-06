@@ -481,6 +481,12 @@ hacs.json              # repo root
 4. **Sources step:** for sources 1–6, an "enabled" toggle and a name (defaults "Source N"). Default: all enabled.
 5. **Options flow** re-opens steps 3–4 at any time. Saving reloads the entry. Devices for disabled zones are
    removed from the device registry.
+6. **Reconfigure** (2026-11-05, M8): change host/port by hand. The address must answer as the same bridge `id`;
+   the token, zones and sources are kept.
+7. **Missed rediscovery** (2026-11-05, M8): Home Assistant once kept a stale address for minutes after the setup
+   portal (`docs/rnet-notes.md`, R6). If the stored address doesn't answer at setup, or after every 3 failed
+   reconnects, the integration browses `_rnetbridge._tcp` for 3 s, keeps the bridge with the entry's `id`, and
+   tries each address it announces. One that answers is saved to `entry.data` (the entry reloads onto it).
 
 Use `selector`-based schemas. Store zone/source config in `entry.options`. Store host/token in `entry.data`.
 
