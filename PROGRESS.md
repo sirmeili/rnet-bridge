@@ -18,16 +18,28 @@
     since this PC can't stay on); measurable soak pass criteria in SPEC §8 (human-approved); the fake bridge now
     pushes zone_state only on change and grows its frame counters, like the firmware; the M8 procedure in
     `docs/rnet-notes.md`. Pre-check against the real bridge: all criteria passed.
-  - Checks: pytest 57/57 on HA 2026.10.4 and 2026.3.1; ruff and mypy clean; Docker image builds (211 MB).
-  - Next: recovery tests R1–R7 with the human, then the 48 h soak, then results and the PR.
+  - 2026-11-05: recovery tests R1–R7 all pass (`docs/rnet-notes.md`). Fixes found on the way, all on this branch:
+    late answers to retried requests no longer count as duplicates; the library no longer closes the oldest
+    WebSocket client when over 4; clients are closed before any restart (HA noticed a reboot after 61–75 s, now
+    <1 s); no mDNS while the portal is open; the integration finds a moved bridge over mDNS and has a reconfigure
+    step. The soak monitor records WebSocket close codes.
+  - On the bridge: firmware up to 8f0b4a1 (close-before-restart). **Not yet on hardware:** the mDNS-in-portal fix
+    (0bcf38a) and the integration change (3c1ead6, needs installing on the real HA).
+  - Checks: native 140/140; pytest 65/65 on current HA and 2026.3.1; ruff and mypy clean; firmware builds.
+  - Bridge now has a test API token and OTA password set (values given by the human for testing; not stored in
+    the repo). The soak monitor needs `-e BRIDGE_TOKEN=...`.
+  - Next: verify the two fixes on hardware (portal: HA keeps the Ethernet address), then the 48 h soak on the
+    Debian host, then results and the PR. Watch the dropped-frame rate (5 in ~75 min after the controller
+    power-cycle; likely line noise, no missed replies).
 - v0.1.1 released 2026-11-04 (turn-on volume restore); the bridge runs 0.1.1.
 
 ## Next
 - Option B for turn-on volume ("wait until the zone is off"), as a setting: plan in
   `docs/plans/turn-on-volume-defer.md`. Default mode decided (defer). **Blocked: where it runs (integration or
   firmware) is undecided; ask the human before starting.**
-- M8 hardening (SPEC §9): 48 h soak; Ethernet/Wi-Fi drop and controller power-cycle recovery; HA restart; OTA
-  from the HA host. Also test the API token and OTA password on hardware (never set so far).
+- M8: the 48 h soak (recovery tests done).
+- Possible later: the bridge's Wi-Fi link dropped HA's connection 6 times in its first 4 minutes at -83 dBm
+  (R2). Wi-Fi is only the fallback; not pursued.
 - Firmware for the enclosure's WS2812 status LED: confirm wiring and voltage first. Not in SPEC yet; ask the
   human when to schedule it.
 
@@ -51,6 +63,9 @@
   than B (defer until the zone is off). The restore was inaudible.
 - 2026-11-04 (human): plan option B as a setting, alongside A. Its default mode will be "wait until the zone is
   off". Where it runs is still open (see Open questions).
+
+- 2026-11-05 (human): fix the stale address after the portal in both the integration (mDNS lookup + reconfigure)
+  and the firmware (no mDNS during the portal).
 
 ## Open questions
 - Option B: run the "wait until off" logic in the integration (recommended) or in the firmware? The human is
