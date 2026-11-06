@@ -358,8 +358,8 @@ Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each o
 | R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | Pass (2026-11-05): no reboot; Wi-Fi off; HA unavailable 10 s, then back |
 | R4 | Home Assistant restart | Integration reconnects; entities return without user action | Pass (2026-11-05): entities back 26 s after HA started, states matched the bridge; the soak monitor's connection stayed up |
 | R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | Pass (2026-11-05), v0.1.1 release image: `{"ok":true}`, rebooted; HA noticed only after 61 s, then reconnected in 1 s. Fixed: clients are now closed before a restart; verified with a second OTA: HA unavailable at the restart, back 8 s later |
-| R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | _pending_ |
-| R7 | OTA password set in the portal | `/api/ota` without it returns 401; with it, succeeds | _pending_ |
+| R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | Pass (2026-11-05): no token refused after 5.1 s, wrong token refused, right token gets the snapshot; HA raised reauth and the token restored it. Found the stale-address bug below |
+| R7 | OTA password set in the portal | `/api/ota` without it returns 401; with it, succeeds | Pass (2026-11-05): none and wrong both 401 with no reboot; right password 200, back in 13 s |
 
 R1 findings:
 - `duplicate_replies` +2 right after the link came back. These were late answers to requests that had been retried
@@ -384,6 +384,14 @@ R2/R3 notes:
   stream from a PC) was closed once with nothing in the bridge's log. Wi-Fi is only the fallback; not pursued.
 - After a reboot, HA noticed only when its 75 s silence check fired (the old TCP connection was never closed).
   Fixed after R5: the bridge closes all clients when a restart is scheduled (see R5).
+
+Stale address after the portal (found in R6, open):
+- With Ethernet connected, opening the portal (double reset) also brings up Wi-Fi, and the bridge announced itself
+  over mDNS at its Wi-Fi address (10.0.0.151). HA's zeroconf updated the entry to it. After the portal save the
+  bridge was back on Ethernet only (10.0.0.165) and announced that, but HA kept retrying 10.0.0.151 for 8+ minutes
+  (setup_retry, backoff up to 320 s). The next reboot's announcement fixed it within 3 s.
+- Planned: the integration re-resolves the bridge over mDNS when it can't connect, plus a reconfigure step to set
+  the host by hand; the firmware stops announcing on Wi-Fi while Ethernet is serving.
 
 ### Soak (48 h)
 Run on a Debian Docker host, from the repo root:
