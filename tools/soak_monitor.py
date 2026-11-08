@@ -1,4 +1,4 @@
-"""Soak monitor for the RNET Bridge (SPEC §9 M8, pass criteria in SPEC §10).
+"""Soak monitor for the RNET Bridge (SPEC §9 M8, pass criteria in SPEC §8).
 
 Watches one bridge for days and records, to OUT_DIR:
 - events.csv: every bridge reset, WebSocket disconnect/reconnect, RNET link change,
@@ -35,7 +35,7 @@ PROTO = 1
 COUNTERS = ("checksum_errors", "dropped", "timeouts", "retries", "duplicate_replies")
 RESULT_TIMEOUT_S = 5.0
 STALL_MIN_INTERVAL_S = 25.0  # periodic `link` comes every 30 s
-LINK_UPTIME_MIN = 0.999  # SPEC §10 soak criterion
+LINK_UPTIME_MIN = 0.999  # SPEC §8 soak criterion
 
 
 def _now_iso() -> str:
@@ -139,19 +139,36 @@ class SoakMonitor:
             writer.writerow([_now_iso(), kind, json.dumps(details, sort_keys=True)])
         print(f"{_now_iso()} {kind} {json.dumps(details, sort_keys=True)}", flush=True)
 
-    def criteria(self) -> dict[str, bool]:
-        """Pass/fail per SPEC §10 soak criterion, for the run so far."""
+    def criteria(self) -> dict[str, bool | None]:
+        """Pass/fail per SPEC §8 soak criterion, for the run so far. None means
+        pending: no data yet (nothing monitored, or no liveness check run)."""
         s = self.state
-        ratio = s.link_up_s / s.monitored_s if s.monitored_s else 0.0
+        link: bool | None = None
+        if s.monitored_s:
+            link = s.link_up_s / s.monitored_s >= LINK_UPTIME_MIN
+        liveness: bool | None = None
+        if s.liveness_failed:
+            liveness = False
+        elif s.liveness_ok:
+            liveness = True
         return {
             "no_bridge_resets": s.bridge_resets == 0,
             "no_duplicate_replies": s.counter_increases.get("duplicate_replies", 0)
             == 0,
-            "link_up_99_9_percent": ratio >= LINK_UPTIME_MIN,
-            "all_liveness_checks_pass": s.liveness_failed == 0 and s.liveness_ok > 0,
+            "link_up_99_9_percent": link,
+            "all_liveness_checks_pass": liveness,
             "no_polling_stalls": s.polling_stalls == 0,
             "no_unplanned_ws_disconnects": s.ws_disconnects == 0,
         }
+
+    def passed(self) -> bool | None:
+        """False if any criterion failed, None (pending) if any has no data yet."""
+        values = list(self.criteria().values())
+        if False in values:
+            return False
+        if None in values:
+            return None
+        return True
 
     def write_summary(self) -> None:
         """Rewrite summary.json (atomically)."""
@@ -159,6 +176,7 @@ class SoakMonitor:
         self.state.last_update = _now_iso()
         s = self.state
         criteria = self.criteria()
+        passed = self.passed()
         summary = {
             "host": s.host,
             "started": s.started,
@@ -168,7 +186,7 @@ class SoakMonitor:
             if s.monitored_s
             else None,
             "criteria": criteria,
-            "pass": all(criteria.values()),
+            "pass": passed,  # null: pending (no data yet for some criterion)
             "state": asdict(s),
         }
         tmp = self._summary_path.with_suffix(".tmp")
@@ -384,7 +402,7 @@ class SoakMonitor:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
         self.write_summary()
-        passed = all(self.criteria().values())
+        passed = self.passed()
         self.event("monitor_stop", passed=passed)
 
 

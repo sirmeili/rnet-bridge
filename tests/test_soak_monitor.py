@@ -139,3 +139,13 @@ async def test_detects_polling_stall(socket_enabled: None, tmp_path: Path) -> No
     summary = json.loads((tmp_path / "summary.json").read_text())
     assert summary["criteria"]["no_polling_stalls"] is False
     assert "polling_stalled" in _events(tmp_path)
+
+
+async def test_pending_before_any_data(fake_bridge: FakeBridge, tmp_path: Path) -> None:
+    """Before anything is monitored or checked, the run is pending, not failed."""
+    monitor = _monitor(fake_bridge, tmp_path, liveness=3600)
+    assert monitor.passed() is None
+    assert monitor.criteria()["link_up_99_9_percent"] is None
+    assert monitor.criteria()["all_liveness_checks_pass"] is None
+    monitor.state.liveness_failed = 1
+    assert monitor.passed() is False
