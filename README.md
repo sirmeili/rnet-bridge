@@ -73,7 +73,7 @@ Plug the bridge into Ethernet and the controller. It gets an address by DHCP and
 
 **Wi-Fi instead of (or as a fallback to) Ethernet:** with no Ethernet, the bridge opens a setup network named
 `RNET-Bridge-XXXX`. Join it from a phone, choose **Configure WiFi**, and enter your network. To reopen this portal
-while on Ethernet, press the reset button **twice within 3 seconds**. The portal is also where you can set an
+while on Ethernet, press the reset button **twice within 3 seconds** (two quick presses). The portal is also where you can set an
 optional API token and OTA password.
 
 ### 3. Add the integration
@@ -103,6 +103,9 @@ optional API token and OTA password.
 
 - **Entities unavailable**: the bridge is offline, or the **RNET link** sensor is off (check the cable, and that
   nothing else is on the RS-232 port).
+- **The bridge's address changed** (e.g. it moved between Ethernet and Wi-Fi): Home Assistant normally follows it
+  by itself, and looks it up again if the old address stops answering. To set the address by hand, use
+  **Reconfigure** in the integration's menu.
 - **Download diagnostics** from the integration's menu: it includes the bridge's link counters, with the API
   token redacted.
 - **Developer tool**: the `rnet_bridge.send_raw` action sends raw RNET bytes through the bridge, exactly as

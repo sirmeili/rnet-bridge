@@ -8,7 +8,7 @@
 
 namespace config {
 
-constexpr const char* kFirmwareVersion = "0.1.1";
+constexpr const char* kFirmwareVersion = "0.2.0";
 
 // UART1 to the Olimex MOD-RS232 via the UEXT connector (SPEC §2.2, §2.4): UEXT pin 3 = GPIO4 (TX),
 // UEXT pin 4 = GPIO36 (RX, input-only). Verified against the ESP32-POE-ISO Rev O schematic.
