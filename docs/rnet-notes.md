@@ -345,8 +345,8 @@ Judged acceptable (2026-11-04). The README invites owners of other controllers t
 open an issue; a test build would turn the restore off (`restore_volume_after_turn_on_volume = false`) or use the
 Event form.
 
-## M8 hardening (in progress)
-Firmware 0.1.1. Procedure and results; recovery tests first, then the 48 h soak with nothing touched.
+## M8 hardening (done 2026-11-07)
+Firmware 0.1.1, then the branch builds noted below. Procedure and results; recovery tests first, then the 48 h soak with nothing touched.
 
 ### Recovery tests
 Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each one.
@@ -411,4 +411,20 @@ If an API token is set (R6), add `-e BRIDGE_TOKEN=...`. Pass criteria: SPEC §8 
 Pre-check (2026-11-05, 95 s against the real bridge from this PC): all criteria passed. 6/6 liveness checks, no
 stalls, link up 100 %.
 
-Result: _pending_
+Result: **pass** (2026-11-05 22:33:48 to 2026-11-07 23:32:27 EST, 48.98 h). Firmware 0bcf38a over Ethernet, API
+token set, monitor in Docker on a Debian VM on the same subnet, HA connected and in normal use throughout.
+
+| Criterion | Result |
+|---|---|
+| No bridge resets | 0 |
+| No duplicate replies | 0 |
+| RNET link up ≥ 99.9 % | 100.0 % (176,320 s) |
+| Every liveness check passes | 293 / 293 |
+| No polling stalls | 0 |
+| No unplanned WebSocket disconnects | 0 (one connection for the whole run) |
+
+Also: 480 zone updates pushed; checksum errors 0; **dropped frames 40** (about 0.8 an hour), 6 of them with a
+timeout that one retry recovered (a reply lost). None caused a missed state. They cluster in the evenings, and the
+frames around one (R1) were clean request/reply pairs, so the likely cause is electrical noise on the RS-232
+cable. Not a pass criterion; if it ever matters, try a shorter or shielded cable first.
+

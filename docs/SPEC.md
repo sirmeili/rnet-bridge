@@ -654,7 +654,9 @@ entity translations, diagnostics, reauth if a token is added later, unavailable 
   | No polling stalls ("stuck") | While the link is up, `link` stats `rx` must grow between the periodic `link` messages (30 s) |
   | No unplanned WebSocket disconnects | The monitor's connection never drops (don't run planned recovery tests during the soak) |
 
-  A run that restarts the monitor (e.g. a host reboot) continues the same totals and records the gap.
+  A run that restarts the monitor (e.g. a host reboot) continues the same totals and records the gap. A criterion
+  with no data yet (nothing monitored, or no liveness check run) reports `null`, and so does `pass`: pending, not
+  failed (2026-11-07).
 
 ---
 
@@ -680,7 +682,8 @@ Each milestone ends in something testable. Hardware steps need the human.
 - **M7 — Polish & release.** Diagnostics, translations, `send_raw`, repair issue for proto mismatch, final brand icons,
   README with HACS install instructions, `release.yml`, first GitHub Release `v0.1.0` installed via HACS on the real HA instance.
 - **M8 — Hardening.** Soak test; Ethernet unplug/replug (fallback to Wi-Fi and back), Wi-Fi drop, and controller
-  power-cycle recovery; HA restart; firmware OTA from HA host.
+  power-cycle recovery; HA restart; firmware OTA from HA host. **Done 2026-11-07:** recovery tests R1–R7 and the
+  48 h soak passed (`docs/rnet-notes.md`).
 
 ---
 

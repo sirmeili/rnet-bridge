@@ -11,34 +11,25 @@
 - 2026-11-03: M5 integration skeleton (PR #8) and M6 entities and options flow (PR #10).
 - 2026-11-04: M7 polish (PR #11). **v0.1.0 released**: firmware.bin, firmware-factory.bin, rnet_bridge.zip. The
   human flashed it over OTA and installed the integration through HACS on the real HA.
+- 2026-11-04: v0.1.1 released (turn-on volume restore).
+- 2026-11-07: M8 hardening on `feat/m8-hardening` (PR pending review). Recovery tests R1–R7 and the 48 h soak
+  passed (`docs/rnet-notes.md`): 48.98 h, 0 resets, 0 disconnects, link up 100 %, 293/293 liveness checks,
+  0 duplicates, 0 checksum errors; 40 dropped frames (likely line noise, no missed state). Fixes on the branch:
+  late answers to retried requests aren't duplicates; no closing the oldest WebSocket client; clients closed
+  before a restart; no mDNS during the portal; the integration finds a moved bridge over mDNS and has a
+  reconfigure step; the soak monitor records close codes and reports "pending" before data. The bridge runs
+  0bcf38a; the integration change reaches the real HA with the next release (human's choice). The bridge has a
+  test API token and OTA password (values from the human; not in the repo).
 
 ## In progress
-- `feat/m8-hardening` (M8, SPEC §9):
-  - Done: `tools/soak_monitor.py` + `tools/soak/Dockerfile` (the human runs the 48 h soak on a Debian Docker host,
-    since this PC can't stay on); measurable soak pass criteria in SPEC §8 (human-approved); the fake bridge now
-    pushes zone_state only on change and grows its frame counters, like the firmware; the M8 procedure in
-    `docs/rnet-notes.md`. Pre-check against the real bridge: all criteria passed.
-  - 2026-11-05: recovery tests R1–R7 all pass (`docs/rnet-notes.md`). Fixes found on the way, all on this branch:
-    late answers to retried requests no longer count as duplicates; the library no longer closes the oldest
-    WebSocket client when over 4; clients are closed before any restart (HA noticed a reboot after 61–75 s, now
-    <1 s); no mDNS while the portal is open; the integration finds a moved bridge over mDNS and has a reconfigure
-    step. The soak monitor records WebSocket close codes.
-  - On the bridge: firmware 0bcf38a (all firmware fixes); the portal fix verified on hardware. The integration
-    change (3c1ead6) reaches the real HA with the next release (human's choice).
-  - Checks: native 140/140; pytest 65/65 on current HA and 2026.3.1; ruff and mypy clean; firmware builds.
-  - Bridge now has a test API token and OTA password set (values given by the human for testing; not stored in
-    the repo). The soak monitor needs `-e BRIDGE_TOKEN=...`.
-  - 48 h soak started 2026-11-05 22:33:48 EST (03:33:48 UTC) on the human's Debian VM, firmware 0bcf38a, with
-    the test token; ends about 2026-11-07 22:34 EST. Results: `/srv/rnet-soak/summary.json` and `events.csv` there.
-  - Next: the soak results, then results and the PR. Watch the dropped-frame rate (5 in ~75 min after the controller
-    power-cycle; likely line noise, no missed replies).
-- v0.1.1 released 2026-11-04 (turn-on volume restore); the bridge runs 0.1.1.
+- `feat/m8-hardening`: PR open for review. After merge: a release (the integration change and the firmware fixes;
+  version bump in `manifest.json` and the firmware, tag to match).
 
 ## Next
 - Option B for turn-on volume ("wait until the zone is off"), as a setting: plan in
   `docs/plans/turn-on-volume-defer.md`. Default mode decided (defer). **Blocked: where it runs (integration or
   firmware) is undecided; ask the human before starting.**
-- M8: the 48 h soak (recovery tests done).
+- Watch the dropped-frame rate in normal use; a shorter or shielded RS-232 cable if it ever matters.
 - Possible later: the bridge's Wi-Fi link dropped HA's connection 6 times in its first 4 minutes at -83 dBm
   (R2). Wi-Fi is only the fallback; not pursued.
 - Firmware for the enclosure's WS2812 status LED: confirm wiring and voltage first. Not in SPEC yet; ask the
