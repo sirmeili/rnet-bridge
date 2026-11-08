@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 import sys
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_HOST, CONF_PORT
 import pytest
@@ -30,6 +31,18 @@ def auto_enable_custom_integrations(
     enable_custom_integrations: None,
 ) -> None:
     """Load custom_components/ in every test."""
+
+
+@pytest.fixture(autouse=True)
+def mock_zeroconf_and_lookup(mock_async_zeroconf: MagicMock) -> Generator[AsyncMock]:
+    """No real mDNS: zeroconf is mocked, and the moved-bridge lookup finds nothing
+    unless a test sets `return_value`."""
+    lookup = AsyncMock(return_value=[])
+    with (
+        patch("custom_components.rnet_bridge.async_find_bridge", lookup),
+        patch("custom_components.rnet_bridge.coordinator.async_find_bridge", lookup),
+    ):
+        yield lookup
 
 
 @pytest.fixture

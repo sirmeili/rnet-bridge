@@ -7,9 +7,11 @@ from dataclasses import dataclass, replace
 import logging
 from typing import TYPE_CHECKING
 
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .api import (
@@ -23,7 +25,14 @@ from .api import (
     Snapshot,
     ZoneState,
 )
-from .const import DOMAIN, RECONNECT_MAX_S, RECONNECT_MIN_S, SUPPORTED_PROTO
+from .const import (
+    DOMAIN,
+    MOVED_CHECK_EVERY,
+    RECONNECT_MAX_S,
+    RECONNECT_MIN_S,
+    SUPPORTED_PROTO,
+)
+from .discovery import async_find_bridge
 
 if TYPE_CHECKING:
     from . import RnetConfigEntry
@@ -140,12 +149,16 @@ class RnetBridgeCoordinator(DataUpdateCoordinator[BridgeData]):
                 _LOGGER.info("Lost connection to the RNET Bridge: %s", err)
             if self.data is not None and self.data.connected:
                 self.async_set_updated_data(replace(self.data, connected=False))
+            failures = 0
             while True:
                 await asyncio.sleep(delay)
                 try:
                     snapshot = await self.client.connect()
                 except RnetBridgeConnectionError as err:
                     _LOGGER.debug("Reconnect failed (retry in %.0f s): %s", delay, err)
+                    failures += 1
+                    if failures % MOVED_CHECK_EVERY == 0 and await self._async_moved():
+                        return  # the entry reloads at the new address
                 except RnetBridgeAuthError as err:
                     # The token changed on the bridge: ask the user (reauth flow).
                     _LOGGER.error("RNET Bridge rejected the API token: %s", err)
@@ -163,6 +176,31 @@ class RnetBridgeCoordinator(DataUpdateCoordinator[BridgeData]):
                     delay = RECONNECT_MIN_S
                     break
                 delay = min(delay * 2, RECONNECT_MAX_S)
+
+    async def _async_moved(self) -> bool:
+        """Look the bridge up over mDNS; if it answers at another address, save
+        that address (the update listener reloads the entry) and return True."""
+        token = self.config_entry.data.get(CONF_TOKEN)
+        current = (self.client.host, self.client.port)
+        for host, port in await async_find_bridge(self.hass, self.bridge_id):
+            if (host, port) == current:
+                continue
+            probe = RnetBridgeClient(
+                async_get_clientsession(self.hass), host, port, token
+            )
+            try:
+                await probe.connect()
+            except RnetBridgeError:
+                continue
+            finally:
+                await probe.close()
+            _LOGGER.info("RNET Bridge moved to %s:%s (was %s:%s)", host, port, *current)
+            self.hass.config_entries.async_update_entry(
+                self.config_entry,
+                data={**self.config_entry.data, CONF_HOST: host, CONF_PORT: port},
+            )
+            return True
+        return False
 
     async def async_send(
         self, cmd: str, zone: int | None = None, value: bool | int | None = None

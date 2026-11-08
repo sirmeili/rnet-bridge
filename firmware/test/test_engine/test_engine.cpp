@@ -597,6 +597,60 @@ void test_regular_polls_are_not_duplicates() {
   TEST_ASSERT_EQUAL_UINT32(0, r.engine.stats().duplicate_replies);
 }
 
+// Stops answering and runs until a zone-info request has been sent twice in a row (a retry).
+// Returns that request's zone.
+uint8_t run_until_retry(Rig& r) {
+  r.io.responsive = false;
+  for (int i = 0; i < 5000; ++i) {
+    r.run_for(1);
+    const size_t n = r.io.count();
+    if (n >= 2) {
+      const SentFrame& a = r.io.sent(n - 2);
+      const SentFrame& b = r.io.sent(n - 1);
+      for (uint8_t z = 1; z <= rnet::kNumZones; ++z) {
+        if (is_zone_info_request(a, z) && is_zone_info_request(b, z)) {
+          return z;
+        }
+      }
+    }
+  }
+  TEST_FAIL_MESSAGE("no retry sent");
+  return 0;
+}
+
+void test_late_answers_to_a_retried_request_are_not_duplicates() {
+  Rig r;
+  r.bring_up();
+  const uint8_t z = run_until_retry(r);
+  // The first attempt's answer arrives late, then the retry's: same bytes, not a retransmission.
+  const WireFrame reply = zone_info_reply(z, r.io.power[z - 1], 2, r.io.volume[z - 1]);
+  r.io.inject(reply);
+  r.run_for(5);
+  r.io.inject(reply);
+  r.run_for(5);
+  TEST_ASSERT_EQUAL_UINT32(0, r.engine.stats().duplicate_replies);
+}
+
+void test_late_answer_after_a_failed_request_is_not_a_duplicate() {
+  Rig r;
+  r.bring_up();
+  const uint8_t z = run_until_retry(r);
+  const auto failed_before = r.engine.stats().timeouts;
+  // Let the remaining attempts time out, then the controller answers one of them.
+  while (r.engine.stats().timeouts < failed_before + 2) {
+    r.run_for(1);
+  }
+  const WireFrame reply = zone_info_reply(z, r.io.power[z - 1], 2, r.io.volume[z - 1]);
+  r.io.inject(reply);
+  r.run_for(5);
+  TEST_ASSERT_EQUAL_UINT32(0, r.engine.stats().duplicate_replies);
+  // Once the window has passed, a repeat counts again.
+  r.run_for(1000);
+  r.io.inject(reply);
+  r.run_for(5);
+  TEST_ASSERT_EQUAL_UINT32(1, r.engine.stats().duplicate_replies);
+}
+
 void test_partial_frame_dropped_after_inter_byte_timeout() {
   Rig r;
   r.bring_up();
@@ -804,6 +858,8 @@ int main() {
   RUN_TEST(test_keypad_traffic_is_ignored);
   RUN_TEST(test_retransmitted_reply_counts_as_duplicate);
   RUN_TEST(test_regular_polls_are_not_duplicates);
+  RUN_TEST(test_late_answers_to_a_retried_request_are_not_duplicates);
+  RUN_TEST(test_late_answer_after_a_failed_request_is_not_a_duplicate);
   RUN_TEST(test_partial_frame_dropped_after_inter_byte_timeout);
   RUN_TEST(test_raw_frame_is_sent_as_is);
   RUN_TEST(test_raw_frame_limits);

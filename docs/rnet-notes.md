@@ -344,3 +344,87 @@ steps; **a short blip is audible for extreme jumps** (e.g. playing at 35 raw wit
 Judged acceptable (2026-11-04). The README invites owners of other controllers that don't move the live volume to
 open an issue; a test build would turn the restore off (`restore_volume_after_turn_on_volume = false`) or use the
 Event form.
+
+## M8 hardening (done 2026-11-07)
+Firmware 0.1.1, then the branch builds noted below. Procedure and results; recovery tests first, then the 48 h soak with nothing touched.
+
+### Recovery tests
+Watch Home Assistant and `python tools/rnet_cli.py watch <bridge>` during each one.
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| R1 | Controller power-cycle | RNET link sensor goes off, then on by itself; zones return to their states | Pass (2026-11-05): link down 16 s, back by itself; HA reconnected at once. Findings below |
+| R2 | Ethernet unplugged (Wi-Fi saved first through the portal) | Bridge falls back to Wi-Fi; HA follows the new address through zeroconf | Pass (2026-11-05), with notes below: on Wi-Fi at a new address, HA followed by itself |
+| R3 | Ethernet plugged back in | Back to Ethernet; Wi-Fi off; HA follows | Pass (2026-11-05): no reboot; Wi-Fi off; HA unavailable 10 s, then back |
+| R4 | Home Assistant restart | Integration reconnects; entities return without user action | Pass (2026-11-05): entities back 26 s after HA started, states matched the bridge; the soak monitor's connection stayed up |
+| R5 | OTA from the HA host (`curl` from its terminal) | `{"ok":true}`; bridge back within ~10 s; HA reconnects | Pass (2026-11-05), v0.1.1 release image: `{"ok":true}`, rebooted; HA noticed only after 61 s, then reconnected in 1 s. Fixed: clients are now closed before a restart; verified with a second OTA: HA unavailable at the restart, back 8 s later |
+| R6 | API token set in the portal | HA raises reauth; the right token restores it; a wrong token is refused | Pass (2026-11-05): no token refused after 5.1 s, wrong token refused, right token gets the snapshot; HA raised reauth and the token restored it. Found the stale-address bug below |
+| R7 | OTA password set in the portal | `/api/ota` without it returns 401; with it, succeeds | Pass (2026-11-05): none and wrong both 401 with no reboot; right password 200, back in 13 s |
+
+R1 findings:
+- `duplicate_replies` +2 right after the link came back. These were late answers to requests that had been retried
+  while the controller booted, not retransmissions. Fixed in the engine: within one request timeout after a retried
+  request is answered or fails, identical replies of the same kind and zone are not counted.
+- The bridge closed a long-lived WebSocket client twice (00:48 and 00:51 UTC). Cause not confirmed. HA history
+  shows no restart then, and only HA and the recorder were connected. Ruled out: ESPAsyncWebServer's close-when-full
+  (off by default). Fixed anyway: `cleanupClients(4)` closed the *oldest* client when more than 4 were open, against
+  protocol.md (the 5th is refused); it now only frees closed clients. Remaining suspect: AsyncTCP's 5 s ACK timeout
+  (the recorder ran under Docker Desktop on Windows). The soak monitor now records the close code: a code means the
+  bridge closed it on purpose; 1006 means the TCP connection ended without a close frame.
+- `dropped`: 5 between 00:53 and 02:04 UTC, none in the 21 h before. None caused a missed reply. Two came 30 s apart
+  at 01:50, when a bathroom light was switched (not one HA records). Possibly electrical noise on the RS-232 cable.
+  Watching in the soak.
+
+R2/R3 notes:
+- The board is powered by PoE: unplugging Ethernet without USB power connected cuts power. Run R2 with USB connected
+  (safe on the ISO board).
+- Double reset needs two quick presses of RST (about 1 s apart). Presses about 8 s apart only rebooted twice.
+- Wi-Fi signal at the bridge was weak (-83 dBm). HA's connection dropped 6 times in the first 4 minutes on Wi-Fi
+  ("connection closed by the bridge", HA the only client), then held for 48 minutes. One other client (the CLI log
+  stream from a PC) was closed once with nothing in the bridge's log. Wi-Fi is only the fallback; not pursued.
+- After a reboot, HA noticed only when its 75 s silence check fired (the old TCP connection was never closed).
+  Fixed after R5: the bridge closes all clients when a restart is scheduled (see R5).
+
+Stale address after the portal (found in R6, fixed):
+- With Ethernet connected, opening the portal (double reset) also brings up Wi-Fi, and the bridge announced itself
+  over mDNS at its Wi-Fi address (10.0.0.151). HA's zeroconf updated the entry to it. After the portal save the
+  bridge was back on Ethernet only (10.0.0.165) and announced that, but HA kept retrying 10.0.0.151 for 8+ minutes
+  (setup_retry, backoff up to 320 s). The next reboot's announcement fixed it within 3 s.
+- Fixed in both. The firmware stops mDNS while the portal is open (0bcf38a). The integration looks the bridge up
+  over mDNS when the stored address fails, and has a reconfigure step (3c1ead6, not yet on the real HA).
+- Firmware fix verified 2026-11-05 with the old integration: double reset, Wi-Fi saved again in the portal. HA
+  stayed on 10.0.0.165 and reconnected without a reload; 10.0.0.151 never answered. A reset-button reboot can't
+  close connections, so HA noticed through its 75 s silence check (a shorter check is a possible improvement).
+
+### Soak (48 h)
+Run on a Debian Docker host, from the repo root:
+```bash
+docker build -t rnet-soak -f tools/soak/Dockerfile tools
+sudo mkdir -p /srv/rnet-soak && sudo chown 10001 /srv/rnet-soak   # the container runs as uid 10001
+docker run -d --name rnet-soak --restart unless-stopped   -e BRIDGE_HOST=10.0.0.165 -v /srv/rnet-soak:/data rnet-soak
+docker logs -f rnet-soak            # live events
+cat /srv/rnet-soak/summary.json     # running pass/fail (rewritten every 10 min)
+docker stop rnet-soak               # at the end: writes the final summary
+```
+If an API token is set (R6), add `-e BRIDGE_TOKEN=...`. Pass criteria: SPEC §8 (soak test).
+
+Pre-check (2026-11-05, 95 s against the real bridge from this PC): all criteria passed. 6/6 liveness checks, no
+stalls, link up 100 %.
+
+Result: **pass** (2026-11-05 22:33:48 to 2026-11-07 23:32:27 EST, 48.98 h). Firmware 0bcf38a over Ethernet, API
+token set, monitor in Docker on a Debian VM on the same subnet, HA connected and in normal use throughout.
+
+| Criterion | Result |
+|---|---|
+| No bridge resets | 0 |
+| No duplicate replies | 0 |
+| RNET link up ≥ 99.9 % | 100.0 % (176,320 s) |
+| Every liveness check passes | 293 / 293 |
+| No polling stalls | 0 |
+| No unplanned WebSocket disconnects | 0 (one connection for the whole run) |
+
+Also: 480 zone updates pushed; checksum errors 0; **dropped frames 40** (about 0.8 an hour), 6 of them with a
+timeout that one retry recovered (a reply lost). None caused a missed state. They cluster in the evenings, and the
+frames around one (R1) were clean request/reply pairs, so the likely cause is electrical noise on the RS-232
+cable. Not a pass criterion; if it ever matters, try a shorter or shielded cable first.
+

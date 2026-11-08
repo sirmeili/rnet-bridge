@@ -33,6 +33,9 @@ class ApiServer {
   static bool owns_result(uint32_t id) { return (id & kCliIdBit) == 0; }
   // The portal needs port 80: stop serving while it is open.
   void set_paused(bool paused);
+  // Closes every WebSocket client with a close frame and refuses new ones, so clients notice a
+  // restart at once instead of through a timeout. Called when a restart is scheduled.
+  void close_all();
   // True once after OTA succeeded or a factory reset was requested: the caller restarts. A factory
   // reset's erase runs here, in the main loop. Call from the main loop only.
   bool take_restart_requested();
@@ -94,6 +97,7 @@ class ApiServer {
   AsyncWebSocket ws_{"/ws"};
   QueueHandle_t events_ = nullptr;
   bool paused_ = false;
+  bool closing_ = false;  // a restart is pending: refuse new clients
 
   Client clients_[kMaxClients] = {};
   Pending pending_[64] = {};

@@ -197,6 +197,14 @@ class Engine {
   uint8_t restore_volume_[kNumZones] = {};
   bool raw_sent_ = false;
   uint32_t raw_sent_ms_ = 0;
+  // After a request that was retried is answered, or fails, the controller may still answer the
+  // other attempts. Until `until_ms`, replies of this kind for this zone are not duplicates.
+  struct LateWindow {
+    RequestKind kind;
+    uint8_t zone;
+    uint32_t until_ms;
+  };
+  LateWindow late_{};
   FrameTap tap_ = nullptr;
   void* tap_ctx_ = nullptr;
 

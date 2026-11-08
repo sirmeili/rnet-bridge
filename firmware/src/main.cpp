@@ -51,6 +51,9 @@ void schedule_restart(uint32_t now_ms) {
     g_restart_pending = true;
     g_restart_at_ms = now_ms + kRestartDelayMs;
     LOG_WARN("restarting in %lu ms", static_cast<unsigned long>(kRestartDelayMs));
+    // Tell WebSocket clients now, while there is time for the close frames to go out; otherwise
+    // they only notice the reboot through their own timeouts (up to 75 s for Home Assistant).
+    g_api->close_all();
   }
 }
 
@@ -72,7 +75,17 @@ void setup() {
   std::snprintf(default_hostname, sizeof(default_hostname), "rnet-bridge-%s", Network::id_suffix());
   g_settings.load(default_hostname);  // before the network: it sets the hostname
   g_api = new ApiServer(g_engine, g_model, g_network, g_settings, g_lock);  // once, at boot
-  g_network.set_portal_hook([](bool opening) { g_api->set_paused(opening); });
+  g_network.set_portal_hook([](bool opening) {
+    g_api->set_paused(opening);
+    // No mDNS while the portal is open: the API is paused, and saving Wi-Fi in the portal joins
+    // Wi-Fi to test it, so the bridge was announced at its Wi-Fi address while serving on
+    // Ethernet. Home Assistant then kept that address (M8 R6).
+    if (opening) {
+      mdns::stop();
+    } else if (g_network.serving() != bridge::Iface::kNone) {
+      mdns::announce(g_settings.hostname, Network::id(), config::kFirmwareVersion);
+    }
+  });
   g_network.begin(double_reset);
   g_cli.set_status_hook([](Print& out) { g_network.print_status(out); });
   g_cli.set_scan_hook([](Print& out) { g_network.start_scan(out); });
@@ -93,7 +106,9 @@ void loop() {
 
   g_network.loop(now);  // pauses/resumes the API around the portal (set_portal_hook)
   if (g_network.take_serving_changed() && g_network.serving() != bridge::Iface::kNone) {
-    mdns::announce(g_settings.hostname, Network::id(), config::kFirmwareVersion);
+    if (!g_network.portal_active()) {  // otherwise announced when the portal closes
+      mdns::announce(g_settings.hostname, Network::id(), config::kFirmwareVersion);
+    }
     ota::begin(g_settings.hostname, g_settings.ota_password);
   }
   ota::loop();

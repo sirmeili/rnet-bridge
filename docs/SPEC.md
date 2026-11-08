@@ -351,6 +351,9 @@ host with a scripted fake controller.
   fall back to Wi-Fi again. The device serves on one interface at a time.
 - Re-announce mDNS on every interface change. The address changes, and the integration follows it through
   zeroconf rediscovery (§5.3).
+- **No mDNS while the portal is open** (2026-11-05, M8). Saving Wi-Fi in the portal joins Wi-Fi to test it, and
+  the bridge was announced at its Wi-Fi address while serving on Ethernet; Home Assistant kept that address after
+  the restart. mDNS stops when the portal opens and is announced again when it closes (the API is paused anyway).
 - Captive portal: start an AP `RNET-Bridge-XXXX` (last 4 of MAC) when there is no Ethernet and either no saved
   Wi-Fi credentials or Wi-Fi fails to connect for 60 s. A board running on Ethernet with no Wi-Fi saved does not
   start the portal. Portal fields: Wi-Fi SSID/password, hostname (default `rnet-bridge-xxxx`), optional API token,
@@ -478,6 +481,12 @@ hacs.json              # repo root
 4. **Sources step:** for sources 1–6, an "enabled" toggle and a name (defaults "Source N"). Default: all enabled.
 5. **Options flow** re-opens steps 3–4 at any time. Saving reloads the entry. Devices for disabled zones are
    removed from the device registry.
+6. **Reconfigure** (2026-11-05, M8): change host/port by hand. The address must answer as the same bridge `id`;
+   the token, zones and sources are kept.
+7. **Missed rediscovery** (2026-11-05, M8): Home Assistant once kept a stale address for minutes after the setup
+   portal (`docs/rnet-notes.md`, R6). If the stored address doesn't answer at setup, or after every 3 failed
+   reconnects, the integration browses `_rnetbridge._tcp` for 3 s, keeps the bridge with the entry's `id`, and
+   tries each address it announces. One that answers is saved to `entry.data` (the entry reloads onto it).
 
 Use `selector`-based schemas. Store zone/source config in `entry.options`. Store host/token in `entry.data`.
 
@@ -633,6 +642,21 @@ entity translations, diagnostics, reauth if a token is added later, unavailable 
   reconnect after server drop, unavailable states.
 - **Hardware-in-the-loop** (manual, documented checklists in `docs/rnet-notes.md`): see milestones below.
 - **Soak test:** 48 h running with HA connected. Zero stuck states, zero firmware resets, stats reviewed.
+  **Measured by `tools/soak_monitor.py`** (Docker image in `tools/soak/`), which runs beside HA on a separate host.
+  Pass criteria (defined 2026-11-03, human-approved), all over the whole run:
+
+  | Criterion | Measured as |
+  |---|---|
+  | No bridge resets | `/api/info` `uptime_s` checked every 5 min; any drop counts as a reset |
+  | No duplicate replies | `duplicate_replies` in `link` stats never increases |
+  | RNET link up ≥ 99.9 % | Time with `link.up` true / time the monitor was connected |
+  | Every liveness check passes | Every 10 min a `refresh` command must be answered `ok` within 5 s |
+  | No polling stalls ("stuck") | While the link is up, `link` stats `rx` must grow between the periodic `link` messages (30 s) |
+  | No unplanned WebSocket disconnects | The monitor's connection never drops (don't run planned recovery tests during the soak) |
+
+  A run that restarts the monitor (e.g. a host reboot) continues the same totals and records the gap. A criterion
+  with no data yet (nothing monitored, or no liveness check run) reports `null`, and so does `pass`: pending, not
+  failed (2026-11-07).
 
 ---
 
@@ -658,7 +682,8 @@ Each milestone ends in something testable. Hardware steps need the human.
 - **M7 — Polish & release.** Diagnostics, translations, `send_raw`, repair issue for proto mismatch, final brand icons,
   README with HACS install instructions, `release.yml`, first GitHub Release `v0.1.0` installed via HACS on the real HA instance.
 - **M8 — Hardening.** Soak test; Ethernet unplug/replug (fallback to Wi-Fi and back), Wi-Fi drop, and controller
-  power-cycle recovery; HA restart; firmware OTA from HA host.
+  power-cycle recovery; HA restart; firmware OTA from HA host. **Done 2026-11-07:** recovery tests R1–R7 and the
+  48 h soak passed (`docs/rnet-notes.md`).
 
 ---
 

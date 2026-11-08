@@ -174,6 +174,16 @@ class RnetBridgeClient:
         self.info: BridgeInfo | None = None
 
     @property
+    def host(self) -> str:
+        """The address this client connects to."""
+        return self._host
+
+    @property
+    def port(self) -> int:
+        """The port this client connects to."""
+        return self._port
+
+    @property
     def connected(self) -> bool:
         """True while the WebSocket is open."""
         return self._ws is not None and not self._ws.closed

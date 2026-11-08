@@ -200,12 +200,18 @@ void Engine::on_reply_to_us(RequestKind kind, uint8_t zone, uint32_t now_ms) {
   // A reply nobody asked for that repeats the last one is a retransmission (SPEC §3.5), unless a
   // raw frame (which may have been a request) went out just before.
   const bool after_raw = raw_sent_ && now_ms - raw_sent_ms_ < cfg_.request_timeout_ms;
-  if (remember_reply(kind, zone) && !expected && !after_raw) {
+  // A late answer to another attempt of a retried request is not a retransmission either.
+  const bool late = late_.kind == kind && late_.zone == zone &&
+                    static_cast<int32_t>(late_.until_ms - now_ms) > 0;
+  if (remember_reply(kind, zone) && !expected && !after_raw && !late) {
     ++stats_.duplicate_replies;
   }
   consecutive_timeouts_ = 0;
   set_link(true, now_ms);
   if (expected) {
+    if (outstanding_.attempts > 1) {
+      late_ = {kind, zone, now_ms + cfg_.request_timeout_ms};
+    }
     outstanding_.kind = RequestKind::kNone;
     if (kind == RequestKind::kTurnOnVolume) {
       schedule_turn_on_volume(zone, now_ms + cfg_.turn_on_volume_poll_ms);
@@ -253,6 +259,7 @@ void Engine::request_failed(uint32_t now_ms) {
   if (outstanding_.kind == RequestKind::kTurnOnVolume) {
     schedule_turn_on_volume(outstanding_.zone, now_ms + cfg_.turn_on_volume_poll_ms);
   }
+  late_ = {outstanding_.kind, outstanding_.zone, now_ms + cfg_.request_timeout_ms};
   outstanding_.kind = RequestKind::kNone;
 }
 

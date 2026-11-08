@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant
@@ -34,6 +36,7 @@ from .coordinator import (
     async_create_proto_issue,
     async_delete_proto_issue,
 )
+from .discovery import async_find_bridge
 from .entity import controller_identifier, zone_enabled, zone_identifier
 from .services import async_setup_services
 
@@ -48,6 +51,8 @@ PLATFORMS: list[Platform] = [
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
+_LOGGER = logging.getLogger(__name__)
+
 type RnetConfigEntry = ConfigEntry[RnetBridgeCoordinator]
 
 
@@ -61,12 +66,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool
     """Connect to the bridge, register the controller device, start listening."""
     host: str = entry.data[CONF_HOST]
     port: int = entry.data.get(CONF_PORT, DEFAULT_PORT)
-    client = RnetBridgeClient(
-        async_get_clientsession(hass), host, port, entry.data.get(CONF_TOKEN)
-    )
-    coordinator = RnetBridgeCoordinator(hass, entry, client)
     try:
-        await coordinator.async_connect()
+        coordinator, host, port = await _async_first_connect(hass, entry, host, port)
     except RnetBridgeConnectionError as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
@@ -111,6 +112,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: RnetConfigEntry) -> bool
     # The options flow changes zones/sources: reload to rebuild entities (SPEC §5.3).
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def _async_connect(
+    hass: HomeAssistant, entry: RnetConfigEntry, host: str, port: int
+) -> RnetBridgeCoordinator:
+    client = RnetBridgeClient(
+        async_get_clientsession(hass), host, port, entry.data.get(CONF_TOKEN)
+    )
+    coordinator = RnetBridgeCoordinator(hass, entry, client)
+    await coordinator.async_connect()
+    return coordinator
+
+
+async def _async_first_connect(
+    hass: HomeAssistant, entry: RnetConfigEntry, host: str, port: int
+) -> tuple[RnetBridgeCoordinator, str, int]:
+    """Connect at the stored address; if it doesn't answer, look the bridge up
+    over mDNS and try the addresses it announces. A found address is saved."""
+    try:
+        return await _async_connect(hass, entry, host, port), host, port
+    except RnetBridgeConnectionError:
+        if entry.unique_id is None:
+            raise
+        for new_host, new_port in await async_find_bridge(hass, entry.unique_id):
+            if (new_host, new_port) == (host, port):
+                continue
+            try:
+                coordinator = await _async_connect(hass, entry, new_host, new_port)
+            except RnetBridgeConnectionError:
+                continue
+            _LOGGER.info(
+                "RNET Bridge found at %s:%s (was %s:%s)", new_host, new_port, host, port
+            )
+            hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_HOST: new_host, CONF_PORT: new_port}
+            )
+            return coordinator, new_host, new_port
+        raise
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: RnetConfigEntry) -> None:
