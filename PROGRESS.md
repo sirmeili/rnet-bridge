@@ -12,7 +12,7 @@
 - 2026-11-04: M7 polish (PR #11). **v0.1.0 released**: firmware.bin, firmware-factory.bin, rnet_bridge.zip. The
   human flashed it over OTA and installed the integration through HACS on the real HA.
 - 2026-11-04: v0.1.1 released (turn-on volume restore).
-- 2026-11-07: M8 hardening on `feat/m8-hardening` (PR pending review). Recovery tests R1–R7 and the 48 h soak
+- 2026-11-07: M8 hardening (PR #13, merged). Recovery tests R1–R7 and the 48 h soak
   passed (`docs/rnet-notes.md`): 48.98 h, 0 resets, 0 disconnects, link up 100 %, 293/293 liveness checks,
   0 duplicates, 0 checksum errors; 40 dropped frames (likely line noise, no missed state). Fixes on the branch:
   late answers to retried requests aren't duplicates; no closing the oldest WebSocket client; clients closed
@@ -22,8 +22,8 @@
   test API token and OTA password (values from the human; not in the repo).
 
 ## In progress
-- `feat/m8-hardening`: PR open for review. After merge: a release (the integration change and the firmware fixes;
-  version bump in `manifest.json` and the firmware, tag to match).
+- `chore/v0.2.0`: integration and firmware bumped to 0.2.0 together; README notes on Reconfigure and the double
+  press. Waiting for the human's approval to push, open the PR, and publish the `v0.2.0` release after merge.
 
 ## Next
 - Option B for turn-on volume ("wait until the zone is off"), as a setting: plan in
